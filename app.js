@@ -1,21 +1,26 @@
-const STATIC_NODES_ENDPOINT = "https://mudfish.net/api/staticnodes";
-const NODE_DETAIL_ENDPOINT = (sid) => `https://mudfish.net/admin/serverstatus/${sid}`;
-const GLOBAL_STATUS_ENDPOINT = "https://mudfish.net/server/status";
+import {
+  STATIC_NODES_ENDPOINT,
+  NODE_DETAIL_ENDPOINT,
+  GLOBAL_STATUS_ENDPOINT,
+  LS_CACHE_KEY,
+  LS_FILTERS_KEY,
+  tableBody,
+  locationFilter,
+  searchInput,
+  countryFilterContainer,
+  countryToggle,
+  hoverCard,
+  hoverCardTemplate,
+  cpuMaxFilter,
+  ioMaxFilter,
+  nicMaxFilter,
+  congestionMaxFilter,
+  bestServerBtn,
+  resetFiltersBtn,
+  langSelect,
+} from './config.js';
 
-const tableBody = document.getElementById("tableBody");
-const locationFilter = document.getElementById("locationFilter");
-const searchInput = document.getElementById("searchInput");
-const countryFilterContainer = document.getElementById("countryFilter");
-const countryToggle = document.getElementById("countryToggle");
-const hoverCard = document.getElementById("hoverCard");
-const hoverCardTemplate = document.getElementById("hoverCardTemplate");
-const cpuMaxFilter = document.getElementById("cpuMaxFilter");
-const ioMaxFilter = document.getElementById("ioMaxFilter");
-const nicMaxFilter = document.getElementById("nicMaxFilter");
-const congestionMaxFilter = document.getElementById("congestionMaxFilter");
-const bestServerBtn = document.getElementById("bestServerBtn");
-const resetFiltersBtn = document.getElementById("resetFiltersBtn");
-const langSelect = document.getElementById("langSelect");
+import { t, setLanguage, applyI18nStatic, METRIC_LABELS, METRIC_IMAGE_LABELS, currentLang } from './i18n.js';
 
 
 let nodes = [];
@@ -31,9 +36,6 @@ let rowObserver = null;
 let isCountryPanelOpen = false;
 let sortState = { key: "region", direction: "asc" };
 
-// localStorage keys
-const LS_CACHE_KEY = "mudfish_server_cache";
-const LS_FILTERS_KEY = "mudfish_user_filters";
 
 function safeGetLS(key) {
   try {
@@ -90,109 +92,16 @@ function saveUserFilters() {
 }
 
 // ================= i18n =================
-let currentLang = "zh"; // zh | en | ja | ko
-const I18N = {
-  zh: {
-    title: "Mudfish 伺服器狀態儀表板",
-    subtitle: "查看全球節點狀態，並依位置與國家前綴快速篩選。",
-    langLabel: "語言",
-    provider: { filterLabel: "供應商篩選", all: "全部供應商" },
-    search: { label: "關鍵字搜尋", placeholder: "主機名或 IP", aria: "輸入主機名或 IP 搜尋" },
-    country: { all: "國家前綴（全部）", selected: (n) => `國家前綴（已選 ${n}）` },
-    load: { section: "系統負載篩選", aria: "系統負載數值篩選", cpu: "CPU", io: "IO", nic: "錯誤", congestion: "擁擠", any: "任意" },
-    buttons: { best: "最佳伺服器", reset: "重置篩選" },
-    table: {
-      headers: { region: "位置", provider: "供應商", ip: "IPv4", sid: "節點 SID", cpu: "CPU %", ioWait: "IO 等待 %", nicError: "網卡錯誤數", network: "流量 (MB)", congestion: "擁擠度" },
-      loading: "正在載入資料…",
-      empty: "找不到符合條件的節點。",
-    },
-    errors: { loadFailed: "無法取得伺服器資料，請稍後再試。" },
-    metricLabels: { systemLoad: "系統負載", network: "流量", congestion: "擁擠度" },
-    metricImageLabels: { systemLoad: "系統負載圖表", network: "流量趨勢圖", congestion: "擁擠度趨勢圖" },
-  },
-  en: {
-    title: "Mudfish Server Status Dashboard",
-    subtitle: "View global nodes and filter by provider and country prefix.",
-    langLabel: "Language",
-    provider: { filterLabel: "Provider Filter", all: "All Providers" },
-    search: { label: "Search", placeholder: "Hostname or IP", aria: "Type hostname or IP to search" },
-    country: { all: "Country Prefix (All)", selected: (n) => `Country Prefix (Selected ${n})` },
-    load: { section: "System Load Filters", aria: "System load value filters", cpu: "CPU", io: "IO", nic: "Errors", congestion: "Congestion", any: "Any" },
-    buttons: { best: "Best Server", reset: "Reset Filters" },
-    table: {
-      headers: { region: "Region", provider: "Provider", ip: "IPv4", sid: "Node SID", cpu: "CPU %", ioWait: "IO Wait %", nicError: "NIC Errors", network: "Traffic (MB)", congestion: "Congestion" },
-      loading: "Loading…",
-      empty: "No matching nodes found.",
-    },
-    errors: { loadFailed: "Failed to fetch data. Please try again later." },
-    metricLabels: { systemLoad: "System Load", network: "Traffic", congestion: "Congestion" },
-    metricImageLabels: { systemLoad: "System Load Chart", network: "Traffic Trend", congestion: "Congestion Trend" },
-  },
-  ja: {
-    title: "Mudfish サーバーステータス ダッシュボード",
-    subtitle: "グローバルノードを表示し、プロバイダーや国コードで絞り込み。",
-    langLabel: "言語",
-    provider: { filterLabel: "プロバイダー", all: "すべてのプロバイダー" },
-    search: { label: "検索", placeholder: "ホスト名 または IP", aria: "ホスト名または IP を入力" },
-    country: { all: "国コード（すべて）", selected: (n) => `国コード（${n} 件選択）` },
-    load: { section: "システム負荷フィルター", aria: "システム負荷の数値フィルター", cpu: "CPU", io: "IO", nic: "エラー", congestion: "混雑度", any: "指定なし" },
-    buttons: { best: "最適サーバー", reset: "フィルターをリセット" },
-    table: {
-      headers: { region: "位置", provider: "プロバイダー", ip: "IPv4", sid: "ノード SID", cpu: "CPU %", ioWait: "IO 待機 %", nicError: "NIC エラー数", network: "トラフィック (MB)", congestion: "混雑度" },
-      loading: "読み込み中…",
-      empty: "一致するノードがありません。",
-    },
-    errors: { loadFailed: "データの取得に失敗しました。しばらくしてからお試しください。" },
-    metricLabels: { systemLoad: "システム負荷", network: "トラフィック", congestion: "混雑度" },
-    metricImageLabels: { systemLoad: "システム負荷グラフ", network: "トラフィック推移", congestion: "混雑度推移" },
-  },
-  ko: {
-    title: "Mudfish 서버 상태 대시보드",
-    subtitle: "전 세계 노드를 확인하고 제공업체와 국가 접두어로 필터링하세요.",
-    langLabel: "언어",
-    provider: { filterLabel: "제공업체 필터", all: "모든 제공업체" },
-    search: { label: "검색", placeholder: "호스트명 또는 IP", aria: "호스트명 또는 IP 입력" },
-    country: { all: "국가 접두어(전체)", selected: (n) => `국가 접두어(${n}개 선택)` },
-    load: { section: "시스템 부하 필터", aria: "시스템 부하 값 필터", cpu: "CPU", io: "IO", nic: "오류", congestion: "혼잡도", any: "제한 없음" },
-    buttons: { best: "최적 서버", reset: "필터 초기화" },
-    table: {
-      headers: { region: "위치", provider: "제공업체", ip: "IPv4", sid: "노드 SID", cpu: "CPU %", ioWait: "IO 대기 %", nicError: "NIC 오류 수", network: "트래픽 (MB)", congestion: "혼잡도" },
-      loading: "로딩 중…",
-      empty: "일치하는 노드가 없습니다.",
-    },
-    errors: { loadFailed: "데이터를 가져오지 못했습니다. 잠시 후 다시 시도하세요." },
-    metricLabels: { systemLoad: "시스템 부하", network: "트래픽", congestion: "혼잡도" },
-    metricImageLabels: { systemLoad: "시스템 부하 차트", network: "트래픽 추이", congestion: "혼잡도 추이" },
-  },
-};
 
-function t(path, vars) {
-  const segs = path.split(".");
-  let cur = I18N[currentLang] || I18N.zh;
-  for (const s of segs) cur = cur?.[s];
-  if (typeof cur === "function") return cur(vars?.count ?? 0);
-  if (cur == null) {
-    // fallback zh
-    cur = I18N.zh;
-    for (const s of segs) cur = cur?.[s];
-  }
-  return cur ?? path;
-}
 
-let METRIC_LABELS = { systemLoad: I18N.zh.metricLabels.systemLoad, network: I18N.zh.metricLabels.network, congestion: I18N.zh.metricLabels.congestion };
-let METRIC_IMAGE_LABELS = { systemLoad: I18N.zh.metricImageLabels.systemLoad, network: I18N.zh.metricImageLabels.network, congestion: I18N.zh.metricImageLabels.congestion };
 
-function setLanguage(lang) {
-  if (!I18N[lang]) lang = "zh";
-  currentLang = lang;
-  document.documentElement.lang = lang === "zh" ? "zh-Hant" : lang;
-  if (langSelect) langSelect.value = lang;
-  METRIC_LABELS = { ...I18N[lang].metricLabels };
-  METRIC_IMAGE_LABELS = { ...I18N[lang].metricImageLabels };
-  applyI18nStatic();
-}
 
-function applyI18nStatic() {
+
+
+
+
+
+function __removed_applyI18nStatic_DO_NOT_USE() {
   // Title/subtitle
   const titleEl = document.querySelector('.page__title');
   if (titleEl) titleEl.textContent = t('title');
@@ -260,7 +169,7 @@ function applyI18nStatic() {
 
 function applyUserFiltersFromStorage(filters) {
   if (!filters) return;
-  if (filters.lang) setLanguage(filters.lang);
+  if (filters.lang) { setLanguage(filters.lang); updateCountryToggleLabel(); }
   if (locationFilter) {
     const found = Array.from(locationFilter.options).some((o) => o.value === filters.location);
     locationFilter.value = found ? filters.location : "all";
@@ -301,6 +210,8 @@ const SORTERS = {
 bootstrap();
 
 async function bootstrap() {
+  applyI18nStatic();
+  updateCountryToggleLabel();
   setTablePlaceholder(t('table.loading'));
   const cached = loadServerCache();
   if (cached) {
@@ -447,6 +358,7 @@ function attachEventListeners() {
   if (langSelect) {
     langSelect.addEventListener("change", (e) => {
       setLanguage(e.target.value);
+      updateCountryToggleLabel();
       saveUserFilters();
       // 語言切換後，重新渲染目前的列表（僅更新標題與表頭，資料無需重取）
       renderTable(getFilteredNodes());
@@ -986,11 +898,11 @@ async function showHoverForRow(row, position) {
     title: baseNode.hostname,
     subtitle: baseNode.location,
     details: [
-      { label: "IPv4", value: baseNode.ip },
-      { label: "節點 SID", value: String(baseNode.sid) },
-      { label: "狀態", value: "正在擷取詳細資料…" },
+      { label: t('hover.labels.ipv4'), value: baseNode.ip },
+      { label: t('hover.labels.sid'), value: String(baseNode.sid) },
+      { label: t('hover.labels.status'), value: t('hover.fetching') },
     ],
-    footer: "首次載入約需 1-2 秒",
+    footer: t('hover.firstLoadHint'),
   });
 
   const anchor = position ?? lastPointerPosition ?? getRowViewportCenter(row);
@@ -1003,8 +915,8 @@ async function showHoverForRow(row, position) {
     }
     const detailRows = buildDetailRows(baseNode, detail);
     const footerText = detail.fetchedAt
-      ? `資料擷取時間：${formatTime(detail.fetchedAt)}`
-      : "即時資料來源：Mudfish";
+      ? `${t('hover.fetchTimePrefix')}${formatTime(detail.fetchedAt)}`
+      : t('hover.liveSource');
 
     updateHoverCardContent({
       title: baseNode.hostname,
@@ -1023,11 +935,11 @@ async function showHoverForRow(row, position) {
       title: baseNode.hostname,
       subtitle: baseNode.location,
       details: [
-        { label: "IPv4", value: baseNode.ip },
-        { label: "節點 SID", value: String(baseNode.sid) },
-        { label: "狀態", value: "無法取得詳細資料" },
+        { label: t('hover.labels.ipv4'), value: baseNode.ip },
+        { label: t('hover.labels.sid'), value: String(baseNode.sid) },
+        { label: t('hover.labels.status'), value: t('hover.fetchFailed') },
       ],
-      footer: "請稍後再試或檢查網路連線",
+      footer: t('hover.retryLater'),
     });
     const fallbackAnchor = lastPointerPosition ?? anchor ?? getRowViewportCenter(row);
     positionHoverCard(fallbackAnchor);
@@ -1104,7 +1016,7 @@ function updateHoverCardContent({ title, subtitle, details, footer }) {
   } else {
     const placeholder = document.createElement("div");
     placeholder.className = "hover-card__placeholder";
-    placeholder.textContent = "暫無詳細資料";
+    placeholder.textContent = t('hover.noDetails');
     detailsEl.appendChild(placeholder);
   }
 
@@ -1118,7 +1030,7 @@ function appendDetailValue(container, value) {
   if (value && typeof value === "object" && value.type === "image") {
     const img = document.createElement("img");
     img.src = value.src;
-    img.alt = value.alt ?? value.label ?? "圖表";
+    img.alt = value.alt ?? value.label ?? t('hover.chartAlt');
     img.loading = "lazy";
     container.appendChild(img);
     if (value.caption) {
@@ -1372,23 +1284,23 @@ function extractValueFromText(source, labels) {
 
 function buildDetailRows(baseNode, detail) {
   const rows = [
-    { label: "IPv4", value: baseNode.ip },
-    { label: "內部地址", value: detail.privateIp || "—" },
-    { label: "運行時間", value: detail.uptime || "—" },
-    { label: "心跳", value: detail.heartbeat || "—" },
+    { label: t('hover.labels.ipv4'), value: baseNode.ip },
+    { label: t('hover.labels.privateIp'), value: detail.privateIp || "—" },
+    { label: t('hover.labels.uptime'), value: detail.uptime || "—" },
+    { label: t('hover.labels.heartbeat'), value: detail.heartbeat || "—" },
   ];
 
   if (detail.pricePolicy?.length) {
-    rows.push({ label: "價格政策", value: detail.pricePolicy.join("\n") });
+    rows.push({ label: t('hover.labels.pricePolicy'), value: detail.pricePolicy.join("\n") });
   }
 
   const aggregated = globalMetrics.get(String(baseNode.sid));
   if (aggregated) {
-    rows.push({ label: "CPU %", value: aggregated.cpuLoadText ?? "—" });
-    rows.push({ label: "IO 等待 %", value: aggregated.ioWaitText ?? "—" });
-    rows.push({ label: "網卡錯誤數", value: aggregated.nicErrorText ?? "—" });
-    rows.push({ label: "流量 (MB)", value: aggregated.networkText ?? "—" });
-    rows.push({ label: "擁擠度", value: aggregated.congestionText ?? "—" });
+    rows.push({ label: t('hover.labels.cpu'), value: aggregated.cpuLoadText ?? "—" });
+    rows.push({ label: t('hover.labels.ioWait'), value: aggregated.ioWaitText ?? "—" });
+    rows.push({ label: t('hover.labels.nicError'), value: aggregated.nicErrorText ?? "—" });
+    rows.push({ label: t('hover.labels.network'), value: aggregated.networkText ?? "—" });
+    rows.push({ label: t('hover.labels.congestion'), value: aggregated.congestionText ?? "—" });
   }
 
   const metrics = detail.metrics ?? {};
@@ -1410,7 +1322,11 @@ function buildDetailRows(baseNode, detail) {
 }
 
 function formatTime(date) {
-  return new Intl.DateTimeFormat("zh-TW", {
+  const locale =
+    currentLang === 'en' ? 'en-US' :
+    currentLang === 'ja' ? 'ja-JP' :
+    currentLang === 'ko' ? 'ko-KR' : 'zh-TW';
+  return new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -1612,10 +1528,6 @@ function handleRowIntersection(entries) {
     });
   });
 }
-
-
-
-
 
 
 
