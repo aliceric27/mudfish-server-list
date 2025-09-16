@@ -22,6 +22,7 @@ import { loadServerCache, saveServerCache, loadUserFilters, saveUserFilters, app
 import { fetchStaticNodes, fetchGlobalMetrics, getServerDetail as getServerDetailRaw } from './api.js';
 import * as Table from './table.js';
 import * as Filters from './filters.js';
+import * as UI from './ui.js';
 
 
 let nodes = [];
@@ -30,11 +31,7 @@ const detailCache = new Map();
 const pendingDetailRequests = new Map();
 const globalMetrics = new Map();
 const selectedCountryCodes = new Set();
-const countryCheckboxes = new Map();
-let activeRow = null;
-let lastPointerPosition = null;
-let rowObserver = null;
-let isCountryPanelOpen = false;
+
 let sortState = { key: "region", direction: "asc" };
 function buildFiltersSnapshot() {
   return {
@@ -89,7 +86,7 @@ function __removed_applyI18nStatic_DO_NOT_USE() {
   }
 
   // Country toggle label
-  updateCountryToggleLabel();
+  UI.updateCountryToggleLabel();
 
   // Load section + labels
   const loadLabel = document.querySelector('.controls__group--load .controls__label');
@@ -174,17 +171,49 @@ async function bootstrap() {
     congestionMaxFilter,
     getNodes: () => nodes,
     renderTable: Table.renderTable,
-    hideHoverCard,
+    hideHoverCard: UI.hideHoverCard,
     saveUserFilters,
     buildFiltersSnapshot,
-    refreshCountryFilterUI,
-    toggleCountryPanel,
+    refreshCountryFilterUI: UI.refreshCountryFilterUI,
+    toggleCountryPanel: UI.toggleCountryPanel,
     setSortState: (s) => { sortState = s; },
     updateSortIndicators: (headers) => Table.updateSortIndicators(headers),
     getHeaderEls: () => document.querySelectorAll("#serverTable thead th[data-sort-key]"),
   });
+  UI.initUI({
+    tableBody,
+    countryFilterContainer,
+    countryToggle,
+    hoverCard,
+    hoverCardTemplate,
+    langSelect,
+    locationFilter,
+    searchInput,
+    cpuMaxFilter,
+    ioMaxFilter,
+    nicMaxFilter,
+    congestionMaxFilter,
+    bestServerBtn,
+    resetFiltersBtn,
+    selectedCountryCodes,
+    nodeLookup,
+    t,
+    setLanguage,
+    onAfterLanguageChange: () => {
+      UI.updateCountryToggleLabel();
+      Table.renderTable(Filters.getFilteredNodes());
+      saveUserFilters(buildFiltersSnapshot());
+    },
+    onFiltersChange: () => Filters.applyFilters(),
+    onResetFilters: () => Filters.resetFilters(),
+    onTableRowClick,
+    renderTable: Table.renderTable,
+    getServerDetailCached,
+    buildDetailRows,
+    formatTime,
+  });
   applyI18nStatic();
-  updateCountryToggleLabel();
+  UI.updateCountryToggleLabel();
   Table.setTablePlaceholder(t('table.loading'));
   const cached = loadServerCache();
   if (cached) {
@@ -197,9 +226,9 @@ async function bootstrap() {
       nodes.forEach((n) => nodeLookup.set(String(n.sid), n));
 
       // 依快取先建 UI 與渲染
-      populateLocationFilter(nodes);
-      populateCountryFilter(nodes);
-      attachEventListeners();
+      UI.populateLocationFilter(nodes);
+      UI.populateCountryFilter(nodes);
+      UI.attachEventListeners();
       Table.setupSorting();
 
       // 套用使用者設定
@@ -207,10 +236,10 @@ async function bootstrap() {
       if (saved) {
         applyUserFiltersFromStorage(saved, {
           setLanguage,
-          updateCountryToggleLabel,
+          updateCountryToggleLabel: UI.updateCountryToggleLabel,
           locationFilter, searchInput, cpuMaxFilter, ioMaxFilter, nicMaxFilter, congestionMaxFilter,
           selectedCountryCodes,
-          refreshCountryFilterUI,
+          refreshCountryFilterUI: UI.refreshCountryFilterUI,
           setSortState: (s) => { sortState = s; }
         });
         Table.updateSortIndicators(document.querySelectorAll("#serverTable thead th[data-sort-key]"));
@@ -276,20 +305,20 @@ async function initialize() {
       nodeLookup.set(String(node.sid), node);
     });
 
-    populateLocationFilter(nodes);
-    populateCountryFilter(nodes);
+    UI.populateLocationFilter(nodes);
+    UI.populateCountryFilter(nodes);
     Table.renderTable(nodes);
-    attachEventListeners();
+    UI.attachEventListeners();
     Table.setupSorting();
     // 套用使用者設定（首次線上載入情境）
     const savedFiltersOnInit = loadUserFilters();
     if (savedFiltersOnInit) {
       applyUserFiltersFromStorage(savedFiltersOnInit, {
         setLanguage,
-        updateCountryToggleLabel,
+        updateCountryToggleLabel: UI.updateCountryToggleLabel,
         locationFilter, searchInput, cpuMaxFilter, ioMaxFilter, nicMaxFilter, congestionMaxFilter,
         selectedCountryCodes,
-        refreshCountryFilterUI,
+        refreshCountryFilterUI: UI.refreshCountryFilterUI,
         setSortState: (s) => { sortState = s; }
       });
       Table.updateSortIndicators(document.querySelectorAll("#serverTable thead th[data-sort-key]"));
@@ -400,13 +429,6 @@ function attachEventListeners() {
   });
 }
 
-function toggleCountryPanel(forceOpen) {
-  const next = typeof forceOpen === "boolean" ? forceOpen : !isCountryPanelOpen;
-  isCountryPanelOpen = next;
-  countryFilterContainer.hidden = !next;
-  countryFilterContainer.classList.toggle("country-filter--open", next);
-  updateCountryToggleLabel();
-}
 
 function setupSorting() {
   const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
@@ -458,7 +480,7 @@ function applyBestServerPreset() {
   const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
   Table.updateSortIndicators(headers);
   Table.renderTable(subset);
-  hideHoverCard();
+  UI.hideHoverCard();
 }
 
 
