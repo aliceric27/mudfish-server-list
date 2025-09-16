@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mudfish Server Status</title>
+  <title>Mudfish Server</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/png" href="/mud.png">
 </head>
 <body>
   <main class="page">
@@ -14,6 +15,15 @@
     </header>
 
     <section class="controls" aria-label="資料篩選">
+      <div class="controls__group controls__group--lang">
+        <label for="langSelect" class="controls__label">語言</label>
+        <select id="langSelect" class="controls__select" aria-label="語言">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+        </select>
+      </div>
       <div class="controls__group">
         <label for="locationFilter" class="controls__label">供應商篩選</label>
         <select id="locationFilter" class="controls__select">
