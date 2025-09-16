@@ -20,6 +20,8 @@ import { t, setLanguage, applyI18nStatic, METRIC_IMAGE_LABELS, currentLang } fro
 import { loadServerCache, saveServerCache, loadUserFilters, saveUserFilters, applyUserFiltersFromStorage } from './storage.js';
 
 import { fetchStaticNodes, fetchGlobalMetrics, getServerDetail as getServerDetailRaw } from './api.js';
+import * as Table from './table.js';
+import * as Filters from './filters.js';
 
 
 let nodes = [];
@@ -143,77 +145,54 @@ const SORTERS = {
 };
 
 
-function updateRowContent(row, node) {
-  row.dataset.sid = String(node.sid);
-  row.dataset.location = node.locationRegion || node.location;
-  row.dataset.hostname = node.hostname;
-  row.dataset.country = node.countryCode;
-  row.dataset.provider = node.provider || "";
-
-  const region = node.locationRegion || node.location;
-  const provider = node.provider || "—";
-  const regionSpan = row.querySelector('.region-cell .truncate-15ch');
-  if (regionSpan) {
-    regionSpan.textContent = region;
-    regionSpan.title = region;
-  }
-  const tds = row.children;
-  if (tds[1]) tds[1].textContent = provider;
-  if (tds[2]) tds[2].textContent = node.ip;
-
-  const metrics = globalMetrics.get(String(node.sid)) ?? null;
-  if (tds[4]) tds[4].innerHTML = renderMetricValue(metrics?.cpuLoadText, "cpuLoad");
-  if (tds[5]) tds[5].innerHTML = renderMetricValue(metrics?.ioWaitText, "ioWait");
-  if (tds[6]) tds[6].innerHTML = renderMetricValue(metrics?.nicErrorText, "nicError");
-  if (tds[7]) tds[7].innerHTML = renderMetricValue(metrics?.networkText, "network");
-  if (tds[8]) tds[8].innerHTML = renderMetricValue(metrics?.congestionText, "congestion");
-
-  applyRowSortDataset(row, metrics);
-}
-
-function updateTableIncremental(desiredList) {
-  const desiredIndex = new Map(desiredList.map((n, i) => [String(n.sid), i]));
-
-  // 移除不在清單中的列
-  Array.from(tableBody.querySelectorAll('tr[data-sid]')).forEach((row) => {
-    const sid = row.dataset.sid;
-    if (!desiredIndex.has(sid)) {
-      tableBody.removeChild(row);
-    }
-  });
-
-  // 依序插入或更新
-  desiredList.forEach((node, index) => {
-    const sid = String(node.sid);
-    let row = tableBody.querySelector(`tr[data-sid="${sid}"]`);
-    const ref = tableBody.children[index] || null;
-
-    if (!row) {
-      row = createRow(node);
-      tableBody.insertBefore(row, ref);
-      observeRow(row);
-    } else {
-      if (row !== ref) {
-        tableBody.insertBefore(row, ref);
-      }
-      updateRowContent(row, node);
-    }
-  });
-}
 
 bootstrap();
 
 async function bootstrap() {
+  Table.initTable({
+    tableBody,
+    globalMetrics,
+    t,
+    getSortState: () => sortState,
+    setSortState: (s) => { sortState = s; },
+    getDisplaySortExtractor: (key) => SORTERS[key] ?? SORTERS.region,
+    getFilteredNodes: Filters.getFilteredNodes,
+    getServerDetailCached,
+    onSortChanged: () => {
+      Table.renderTable(Filters.getFilteredNodes());
+      saveUserFilters(buildFiltersSnapshot());
+    },
+  });
+  Filters.initFilters({
+    globalMetrics,
+    selectedCountryCodes,
+    locationFilter,
+    searchInput,
+    cpuMaxFilter,
+    ioMaxFilter,
+    nicMaxFilter,
+    congestionMaxFilter,
+    getNodes: () => nodes,
+    renderTable: Table.renderTable,
+    hideHoverCard,
+    saveUserFilters,
+    buildFiltersSnapshot,
+    refreshCountryFilterUI,
+    toggleCountryPanel,
+    setSortState: (s) => { sortState = s; },
+    updateSortIndicators: (headers) => Table.updateSortIndicators(headers),
+    getHeaderEls: () => document.querySelectorAll("#serverTable thead th[data-sort-key]"),
+  });
   applyI18nStatic();
   updateCountryToggleLabel();
-  setTablePlaceholder(t('table.loading'));
+  Table.setTablePlaceholder(t('table.loading'));
   const cached = loadServerCache();
   if (cached) {
     try {
       // 合併快取的 metrics 與節點
       const metricsMap = new Map(Object.entries(cached.metrics || {}));
       mergeGlobalMetrics(metricsMap);
-      nodes = sortNodes((cached.nodes || []).map(enrichNode));
+      nodes = Table.sortNodes((cached.nodes || []).map(enrichNode));
       nodeLookup.clear();
       nodes.forEach((n) => nodeLookup.set(String(n.sid), n));
 
@@ -221,7 +200,7 @@ async function bootstrap() {
       populateLocationFilter(nodes);
       populateCountryFilter(nodes);
       attachEventListeners();
-      setupSorting();
+      Table.setupSorting();
 
       // 套用使用者設定
       const saved = loadUserFilters();
@@ -234,10 +213,10 @@ async function bootstrap() {
           refreshCountryFilterUI,
           setSortState: (s) => { sortState = s; }
         });
-        updateSortIndicators(document.querySelectorAll("#serverTable thead th[data-sort-key]"));
-        renderTable(getFilteredNodes());
+        Table.updateSortIndicators(document.querySelectorAll("#serverTable thead th[data-sort-key]"));
+        Table.renderTable(Filters.getFilteredNodes());
       } else {
-        renderTable(nodes);
+        Table.renderTable(nodes);
       }
 
       // 背景刷新最新資料
@@ -259,16 +238,16 @@ async function startBackgroundRefresh() {
     ]);
     mergeGlobalMetrics(statusMetrics);
 
-    const newNodes = sortNodes(fetchedNodes.map(enrichNode));
+    const newNodes = Table.sortNodes(fetchedNodes.map(enrichNode));
     // 更新 nodeLookup 與 in-memory nodes
     nodeLookup.clear();
     newNodes.forEach((n) => nodeLookup.set(String(n.sid), n));
 
     // 依目前篩選 + 排序，計算應顯示清單
-    const desiredList = sortForDisplay(getFilteredNodes(newNodes));
+    const desiredList = Table.sortForDisplay(Filters.getFilteredNodes(newNodes));
 
     // 增量更新表格
-    updateTableIncremental(desiredList);
+    Table.updateTableIncremental(desiredList);
 
     // 最後替換記憶中的 nodes
     nodes = newNodes;
@@ -282,7 +261,7 @@ async function startBackgroundRefresh() {
 
 
 async function initialize() {
-  setTablePlaceholder(t('table.loading'));
+  Table.setTablePlaceholder(t('table.loading'));
   try {
     const [fetchedNodes, statusMetrics] = await Promise.all([
       fetchStaticNodes(),
@@ -291,7 +270,7 @@ async function initialize() {
 
     mergeGlobalMetrics(statusMetrics);
 
-    nodes = sortNodes(fetchedNodes.map(enrichNode));
+    nodes = Table.sortNodes(fetchedNodes.map(enrichNode));
     nodeLookup.clear();
     nodes.forEach((node) => {
       nodeLookup.set(String(node.sid), node);
@@ -299,9 +278,9 @@ async function initialize() {
 
     populateLocationFilter(nodes);
     populateCountryFilter(nodes);
-    renderTable(nodes);
+    Table.renderTable(nodes);
     attachEventListeners();
-    setupSorting();
+    Table.setupSorting();
     // 套用使用者設定（首次線上載入情境）
     const savedFiltersOnInit = loadUserFilters();
     if (savedFiltersOnInit) {
@@ -313,8 +292,8 @@ async function initialize() {
         refreshCountryFilterUI,
         setSortState: (s) => { sortState = s; }
       });
-      updateSortIndicators(document.querySelectorAll("#serverTable thead th[data-sort-key]"));
-      renderTable(getFilteredNodes());
+      Table.updateSortIndicators(document.querySelectorAll("#serverTable thead th[data-sort-key]"));
+      Table.renderTable(Filters.getFilteredNodes());
     }
 
     //        
@@ -322,7 +301,7 @@ async function initialize() {
 
   } catch (error) {
     console.error("初始化失敗", error);
-    setTablePlaceholder(t('errors.loadFailed'));
+    Table.setTablePlaceholder(t('errors.loadFailed'));
   }
 }
 
@@ -336,14 +315,14 @@ function mergeGlobalMetrics(metricsMap) {
 }
 
 function attachEventListeners() {
-  locationFilter.addEventListener("change", applyFilters);
-  searchInput.addEventListener("input", applyFilters);
-  cpuMaxFilter.addEventListener("input", applyFilters);
-  ioMaxFilter.addEventListener("input", applyFilters);
-  nicMaxFilter.addEventListener("input", applyFilters);
-  congestionMaxFilter.addEventListener("input", applyFilters);
+  locationFilter.addEventListener("change", Filters.applyFilters);
+  searchInput.addEventListener("input", Filters.applyFilters);
+  cpuMaxFilter.addEventListener("input", Filters.applyFilters);
+  ioMaxFilter.addEventListener("input", Filters.applyFilters);
+  nicMaxFilter.addEventListener("input", Filters.applyFilters);
+  congestionMaxFilter.addEventListener("input", Filters.applyFilters);
   bestServerBtn.addEventListener("click", applyBestServerPreset);
-  resetFiltersBtn.addEventListener("click", resetFilters);
+  resetFiltersBtn.addEventListener("click", Filters.resetFilters);
 
   // 語言切換
   if (langSelect) {
@@ -352,7 +331,7 @@ function attachEventListeners() {
       updateCountryToggleLabel();
       saveUserFilters(buildFiltersSnapshot());
       // 語言切換後，重新渲染目前的列表（僅更新標題與表頭，資料無需重取）
-      renderTable(getFilteredNodes());
+      Table.renderTable(Filters.getFilteredNodes());
     });
   }
 
@@ -442,12 +421,12 @@ function setupSorting() {
       } else {
         sortState = { key, direction: "asc" };
       }
-      updateSortIndicators(headers);
-      renderTable(getFilteredNodes());
+      Table.updateSortIndicators(headers);
+      Table.renderTable(Filters.getFilteredNodes());
       saveUserFilters(buildFiltersSnapshot());
     });
   });
-  updateSortIndicators(headers);
+  Table.updateSortIndicators(headers);
 }
 
 function updateSortIndicators(headers) {
@@ -459,15 +438,9 @@ function updateSortIndicators(headers) {
   });
 }
 
-function applyFilters() {
-  const filtered = getFilteredNodes();
-  renderTable(filtered);
-  hideHoverCard();
-  saveUserFilters(buildFiltersSnapshot());
-}
 
 function applyBestServerPreset() {
-  const base = getFilteredNodes();
+  const base = Filters.getFilteredNodes();
   const subset = base.filter((node) => {
     const m = globalMetrics.get(String(node.sid));
     if (!m) return false;
@@ -483,35 +456,11 @@ function applyBestServerPreset() {
 
   sortState = { key: "network", direction: "asc" };
   const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
-  updateSortIndicators(headers);
-  renderTable(subset);
+  Table.updateSortIndicators(headers);
+  Table.renderTable(subset);
   hideHoverCard();
 }
 
-function resetFilters() {
-  // 清空所有輸入與選擇
-  if (locationFilter) locationFilter.value = "all";
-  if (searchInput) searchInput.value = "";
-  if (cpuMaxFilter) cpuMaxFilter.value = "";
-  if (ioMaxFilter) ioMaxFilter.value = "";
-  if (nicMaxFilter) nicMaxFilter.value = "";
-  if (congestionMaxFilter) congestionMaxFilter.value = "";
-
-  // 重置國家前綴選擇並關閉面板
-  selectedCountryCodes.clear();
-  refreshCountryFilterUI();
-  toggleCountryPanel(false);
-
-  // 恢復預設排序（以位置升序）
-  sortState = { key: "region", direction: "asc" };
-  const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
-  updateSortIndicators(headers);
-
-  // 重新渲染
-  renderTable(getFilteredNodes());
-  hideHoverCard();
-  saveUserFilters(buildFiltersSnapshot());
-}
 
 
 
@@ -607,7 +556,7 @@ function populateCountryFilter(nodeList) {
   allOption.input.addEventListener("change", () => {
     selectedCountryCodes.clear();
     refreshCountryFilterUI();
-    renderTable(getFilteredNodes());
+    Table.renderTable(Filters.getFilteredNodes());
     saveUserFilters(buildFiltersSnapshot());
   });
 
@@ -684,7 +633,7 @@ function updateTableIncremental(desiredList) {
         selectedCountryCodes.delete(code);
       }
       refreshCountryFilterUI();
-      renderTable(getFilteredNodes());
+      Table.renderTable(Filters.getFilteredNodes());
       saveUserFilters(buildFiltersSnapshot());
     });
   });
@@ -744,11 +693,11 @@ function renderTable(data) {
   tableBody.innerHTML = "";
   if (!data.length) {
     clearRowObserver();
-    setTablePlaceholder(t('table.empty'));
+    Table.setTablePlaceholder(t('table.empty'));
     return;
   }
 
-  const sorted = sortForDisplay(data);
+  const sorted = Table.sortForDisplay(data);
   clearRowObserver();
   const fragment = document.createDocumentFragment();
   const rowsToObserve = [];
@@ -1081,7 +1030,7 @@ function updateRowWithDetail(sid) {
     return;
   }
   const metrics = globalMetrics.get(String(sid)) ?? null;
-  applyRowSortDataset(row, metrics);
+  Table.applyRowSortDataset(row, metrics);
 }
 
 // Helpers for parsing list-based labels/values in server status panel
