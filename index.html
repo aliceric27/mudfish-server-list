@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mudfish Server Status</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+    <header class="page__header">
+      <h1 class="page__title">Mudfish 伺服器狀態儀表板</h1>
+      <p class="page__subtitle">查看全球節點狀態，並依位置與國家前綴快速篩選。</p>
+    </header>
+
+    <section class="controls" aria-label="資料篩選">
+      <div class="controls__group">
+        <label for="locationFilter" class="controls__label">供應商篩選</label>
+        <select id="locationFilter" class="controls__select">
+          <option value="all">全部供應商</option>
+        </select>
+      </div>
+      <div class="controls__group controls__group--search">
+        <label for="searchInput" class="controls__label">關鍵字搜尋</label>
+        <input type="search" id="searchInput" class="controls__search" placeholder="主機名或 IP" aria-label="輸入主機名或 IP 搜尋">
+      </div>
+      <div class="controls__group controls__group--countries">
+        <button id="countryToggle" class="country-filter__toggle" type="button" aria-expanded="false" aria-controls="countryFilter">
+          國家前綴（全部）
+        </button>
+        <div id="countryFilter" class="country-filter" role="group" aria-label="依國家前綴篩選" hidden></div>
+      </div>
+      <div class="controls__group controls__group--load">
+        <span class="controls__label">系統負載篩選</span>
+        <div class="load-filter" role="group" aria-label="系統負載數值篩選">
+          <label class="load-filter__field" for="cpuMaxFilter">CPU ≤
+            <input type="number" id="cpuMaxFilter" class="load-filter__input" min="0" step="1" placeholder="任意">
+          </label>
+          <label class="load-filter__field" for="ioMaxFilter">IO ≤
+            <input type="number" id="ioMaxFilter" class="load-filter__input" min="0" step="1" placeholder="任意">
+          </label>
+          <label class="load-filter__field" for="nicMaxFilter">錯誤 ≤
+            <input type="number" id="nicMaxFilter" class="load-filter__input" min="0" step="1" placeholder="任意">
+          </label>
+          <label class="load-filter__field" for="congestionMaxFilter">擁擠 ≤
+            <input type="number" id="congestionMaxFilter" class="load-filter__input" min="0" step="1" placeholder="任意">
+          </label>
+          <button id="bestServerBtn" class="action-button" type="button">最佳伺服器</button>
+          <button id="resetFiltersBtn" class="action-button" type="button">重置篩選</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="table-wrapper" aria-live="polite">
+      <table class="status-table" id="serverTable">
+        <thead>
+          <tr>
+            <th scope="col" data-sort-key="region">位置</th>
+            <th scope="col" data-sort-key="provider">供應商</th>
+            <th scope="col" data-sort-key="ip">IPv4</th>
+            <th scope="col" data-sort-key="sid">節點 SID</th>
+            <th scope="col" data-sort-key="cpuLoad">CPU %</th>
+            <th scope="col" data-sort-key="ioWait">IO 等待 %</th>
+            <th scope="col" data-sort-key="nicError">網卡錯誤數</th>
+            <th scope="col" data-sort-key="network">流量 (MB)</th>
+            <th scope="col" data-sort-key="congestion">擁擠度</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr>
+            <td colspan="9" class="status-table__placeholder">正在載入資料…</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div id="hoverCard" class="hover-card" role="status" aria-live="polite" hidden></div>
+
+    <section class="page__footer" aria-label="使用說明">
+      <h2>使用方式</h2>
+      <ul>
+        <li>將滑鼠移至任一列，可即時抓取詳細伺服器狀態並顯示。</li>
+        <li>表格會在節點進入視窗時自動下載詳細資料並更新系統負載、流量與擁擠度欄位。</li>
+        <li>下拉選單可依不同地區查看節點，搜尋欄支援主機名與 IP，國家前綴可多選。</li>
+      </ul>
+    </section>
+  </main>
+
+  <template id="hoverCardTemplate">
+    <article class="hover-card__content">
+      <header class="hover-card__header">
+        <h3 class="hover-card__title"></h3>
+        <p class="hover-card__subtitle"></p>
+      </header>
+      <dl class="hover-card__details"></dl>
+      <footer class="hover-card__footer"></footer>
+    </article>
+  </template>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
+

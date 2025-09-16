@@ -1,0 +1,1215 @@
+const STATIC_NODES_ENDPOINT = "https://mudfish.net/api/staticnodes";
+const NODE_DETAIL_ENDPOINT = (sid) => `https://mudfish.net/admin/serverstatus/${sid}`;
+const GLOBAL_STATUS_ENDPOINT = "https://mudfish.net/server/status";
+
+const tableBody = document.getElementById("tableBody");
+const locationFilter = document.getElementById("locationFilter");
+const searchInput = document.getElementById("searchInput");
+const countryFilterContainer = document.getElementById("countryFilter");
+const countryToggle = document.getElementById("countryToggle");
+const hoverCard = document.getElementById("hoverCard");
+const hoverCardTemplate = document.getElementById("hoverCardTemplate");
+const cpuMaxFilter = document.getElementById("cpuMaxFilter");
+const ioMaxFilter = document.getElementById("ioMaxFilter");
+const nicMaxFilter = document.getElementById("nicMaxFilter");
+const congestionMaxFilter = document.getElementById("congestionMaxFilter");
+const bestServerBtn = document.getElementById("bestServerBtn");
+const resetFiltersBtn = document.getElementById("resetFiltersBtn");
+
+let nodes = [];
+const nodeLookup = new Map();
+const detailCache = new Map();
+const pendingDetailRequests = new Map();
+const globalMetrics = new Map();
+const selectedCountryCodes = new Set();
+const countryCheckboxes = new Map();
+let activeRow = null;
+let lastPointerPosition = null;
+let rowObserver = null;
+let isCountryPanelOpen = false;
+let sortState = { key: "region", direction: "asc" };
+
+const METRIC_LABELS = {
+  systemLoad: "系統負載",
+  network: "流量",
+  congestion: "擁擠度",
+};
+
+const METRIC_IMAGE_LABELS = {
+  systemLoad: "系統負載圖表",
+  network: "流量趨勢圖",
+  congestion: "擁擠度趨勢圖",
+};
+
+const SORTERS = {
+  region: (node) => (node.locationRegion || node.location || "").toLowerCase(),
+  provider: (node) => (node.providerBrand || node.provider || "").toLowerCase(),
+  ip: (node) => node.ip,
+  sid: (node) => Number(node.sid) || 0,
+  cpuLoad: (node) => getGlobalMetricSortValue(node.sid, "cpuLoad"),
+  ioWait: (node) => getGlobalMetricSortValue(node.sid, "ioWait"),
+  nicError: (node) => getGlobalMetricSortValue(node.sid, "nicError"),
+  network: (node) => getGlobalMetricSortValue(node.sid, "network"),
+  congestion: (node) => getGlobalMetricSortValue(node.sid, "congestion"),
+};
+
+initialize();
+
+async function initialize() {
+  setTablePlaceholder("正在載入資料…");
+  try {
+    const [fetchedNodes, statusMetrics] = await Promise.all([
+      fetchStaticNodes(),
+      fetchGlobalMetrics(),
+    ]);
+
+    mergeGlobalMetrics(statusMetrics);
+
+    nodes = sortNodes(fetchedNodes.map(enrichNode));
+    nodeLookup.clear();
+    nodes.forEach((node) => {
+      nodeLookup.set(String(node.sid), node);
+    });
+
+    populateLocationFilter(nodes);
+    populateCountryFilter(nodes);
+    renderTable(nodes);
+    attachEventListeners();
+    setupSorting();
+  } catch (error) {
+    console.error("初始化失敗", error);
+    setTablePlaceholder("無法取得伺服器資料，請稍後再試。");
+  }
+}
+
+async function fetchStaticNodes() {
+  const response = await fetch(STATIC_NODES_ENDPOINT);
+  if (!response.ok) {
+    throw new Error(`取得節點資料時發生錯誤：${response.status}`);
+  }
+  const payload = await response.json();
+  if (!payload?.staticnodes) {
+    throw new Error("回傳格式不如預期");
+  }
+  return payload.staticnodes;
+}
+
+async function fetchGlobalMetrics() {
+  const response = await fetch(GLOBAL_STATUS_ENDPOINT);
+  if (!response.ok) {
+    throw new Error(`取得節點指標時發生錯誤：${response.status}`);
+  }
+  const html = await response.text();
+  return parseGlobalStatusHtml(html);
+}
+
+function mergeGlobalMetrics(metricsMap) {
+  globalMetrics.clear();
+  metricsMap.forEach((value, key) => {
+    globalMetrics.set(String(key), value);
+  });
+}
+
+function attachEventListeners() {
+  locationFilter.addEventListener("change", applyFilters);
+  searchInput.addEventListener("input", applyFilters);
+  cpuMaxFilter.addEventListener("input", applyFilters);
+  ioMaxFilter.addEventListener("input", applyFilters);
+  nicMaxFilter.addEventListener("input", applyFilters);
+  congestionMaxFilter.addEventListener("input", applyFilters);
+  bestServerBtn.addEventListener("click", applyBestServerPreset);
+  resetFiltersBtn.addEventListener("click", resetFilters);
+
+  // 表格列點擊：跳轉到該節點的管理頁
+  tableBody.addEventListener("click", onTableRowClick);
+
+  countryToggle.addEventListener("click", () => toggleCountryPanel());
+  countryToggle.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleCountryPanel();
+    }
+  });
+
+  tableBody.addEventListener("pointerover", (event) => {
+    const row = event.target.closest("tr[data-sid]");
+    if (!row) {
+      if (activeRow) {
+        hideHoverCard();
+      }
+      return;
+    }
+    if (activeRow !== row) {
+      lastPointerPosition = { x: event.clientX, y: event.clientY };
+      showHoverForRow(row, lastPointerPosition);
+    }
+  });
+
+  tableBody.addEventListener("pointermove", (event) => {
+    if (!activeRow) {
+      return;
+    }
+    lastPointerPosition = { x: event.clientX, y: event.clientY };
+    positionHoverCard(lastPointerPosition);
+  });
+
+  tableBody.addEventListener("pointerout", (event) => {
+    const relatedRow = event.relatedTarget?.closest?.("tr[data-sid]");
+    if (!relatedRow) {
+      hideHoverCard();
+    }
+  });
+
+  tableBody.addEventListener("focusin", (event) => {
+    const row = event.target.closest("tr[data-sid]");
+    if (row) {
+      showHoverForRow(row, getRowViewportCenter(row));
+    }
+  });
+
+  tableBody.addEventListener("focusout", (event) => {
+    if (!tableBody.contains(event.relatedTarget)) {
+      hideHoverCard();
+    }
+  });
+
+  window.addEventListener("scroll", () => {
+    if (activeRow) {
+      positionHoverCard(getRowViewportCenter(activeRow));
+    }
+  });
+  window.addEventListener("resize", () => {
+    if (activeRow) {
+      positionHoverCard(getRowViewportCenter(activeRow));
+    }
+  });
+}
+
+function toggleCountryPanel(forceOpen) {
+  const next = typeof forceOpen === "boolean" ? forceOpen : !isCountryPanelOpen;
+  isCountryPanelOpen = next;
+  countryFilterContainer.hidden = !next;
+  countryFilterContainer.classList.toggle("country-filter--open", next);
+  updateCountryToggleLabel();
+}
+
+function setupSorting() {
+  const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
+  headers.forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sortKey;
+      if (!key) {
+        return;
+      }
+      if (sortState.key === key) {
+        sortState.direction = sortState.direction === "asc" ? "desc" : "asc";
+      } else {
+        sortState = { key, direction: "asc" };
+      }
+      updateSortIndicators(headers);
+      renderTable(getFilteredNodes());
+    });
+  });
+  updateSortIndicators(headers);
+}
+
+function updateSortIndicators(headers) {
+  headers.forEach((th) => {
+    th.classList.remove("is-asc", "is-desc");
+    if (th.dataset.sortKey === sortState.key) {
+      th.classList.add(sortState.direction === "asc" ? "is-asc" : "is-desc");
+    }
+  });
+}
+
+function applyFilters() {
+  const filtered = getFilteredNodes();
+  renderTable(filtered);
+  hideHoverCard();
+}
+
+function applyBestServerPreset() {
+  const base = getFilteredNodes();
+  const subset = base.filter((node) => {
+    const m = globalMetrics.get(String(node.sid));
+    if (!m) return false;
+    const isZero = (v) => Number.isFinite(v) && v === 0;
+    return isZero(m.cpuLoadValue) && isZero(m.ioWaitValue) && isZero(m.nicErrorValue) && isZero(m.congestionValue);
+  });
+  //
+
+
+
+
+
+
+  sortState = { key: "network", direction: "asc" };
+  const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
+  updateSortIndicators(headers);
+  renderTable(subset);
+  hideHoverCard();
+}
+
+function resetFilters() {
+  // 清空所有輸入與選擇
+  if (locationFilter) locationFilter.value = "all";
+  if (searchInput) searchInput.value = "";
+  if (cpuMaxFilter) cpuMaxFilter.value = "";
+  if (ioMaxFilter) ioMaxFilter.value = "";
+  if (nicMaxFilter) nicMaxFilter.value = "";
+  if (congestionMaxFilter) congestionMaxFilter.value = "";
+
+  // 重置國家前綴選擇並關閉面板
+  selectedCountryCodes.clear();
+  refreshCountryFilterUI();
+  toggleCountryPanel(false);
+
+  // 恢復預設排序（以位置升序）
+  sortState = { key: "region", direction: "asc" };
+  const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
+  updateSortIndicators(headers);
+
+  // 重新渲染
+  renderTable(getFilteredNodes());
+  hideHoverCard();
+}
+
+
+
+function getFilteredNodes() {
+
+  const locationValue = locationFilter.value;
+  const keyword = searchInput.value.trim().toLowerCase();
+  const cpuMax = parseFloat(cpuMaxFilter.value);
+  const ioMax = parseFloat(ioMaxFilter.value);
+  const nicMax = parseFloat(nicMaxFilter.value);
+  const congestionMax = parseFloat(congestionMaxFilter.value);
+  const cpuActive = Number.isFinite(cpuMax);
+  const ioActive = Number.isFinite(ioMax);
+  const nicActive = Number.isFinite(nicMax);
+  const congestionActive = Number.isFinite(congestionMax);
+
+  return nodes.filter((node) => {
+    // 供應商篩選
+    const region = node.locationRegion || node.location;
+    const providerBrand = node.providerBrand || "";
+    if (!(locationValue === "all" || providerBrand === locationValue)) {
+      return false;
+    }
+
+    // 國家
+    if (!(selectedCountryCodes.size === 0 || selectedCountryCodes.has(node.countryCode))) {
+      return false;
+    }
+
+    // 系統負載（CPU / IO / NIC 錯誤）上限篩選
+    if (cpuActive || ioActive || nicActive || congestionActive) {
+      const m = globalMetrics.get(String(node.sid));
+      if (!m) {
+        return false;
+      }
+      if (cpuActive && !(Number.isFinite(m.cpuLoadValue) && m.cpuLoadValue <= cpuMax)) {
+        return false;
+      }
+      if (ioActive && !(Number.isFinite(m.ioWaitValue) && m.ioWaitValue <= ioMax)) {
+        return false;
+      }
+      if (nicActive && !(Number.isFinite(m.nicErrorValue) && m.nicErrorValue <= nicMax)) {
+        return false;
+      }
+      if (congestionActive && !(Number.isFinite(m.congestionValue) && m.congestionValue <= congestionMax)) {
+        return false;
+      }
+      }
+
+    // 關鍵字（主機名 / IP / Region / Provider）
+    if (keyword) {
+      const haystack = `${node.hostname} ${node.ip} ${region} ${node.provider || ""} ${node.providerBrand || ""}`.toLowerCase();
+      if (!haystack.includes(keyword)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+function populateLocationFilter(nodeList) {
+  // 供應商品牌選項（排除空字串），依字母排序
+  const providers = Array.from(new Set(nodeList.map((node) => node.providerBrand).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  const fragment = document.createDocumentFragment();
+  providers.forEach((brand) => {
+    const option = document.createElement("option");
+    option.value = brand;
+    option.textContent = brand;
+    fragment.appendChild(option);
+  });
+  locationFilter.appendChild(fragment);
+}
+
+function populateCountryFilter(nodeList) {
+  countryFilterContainer.innerHTML = "";
+  countryCheckboxes.clear();
+
+  const counts = new Map();
+  nodeList.forEach((node) => {
+    const code = node.countryCode;
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  });
+
+  const sorted = Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], "en"));
+  const fragment = document.createDocumentFragment();
+
+  const allOption = createCountryOption("__all__", "全部", nodeList.length);
+  fragment.appendChild(allOption.element);
+  countryCheckboxes.set("__all__", allOption.input);
+  allOption.input.addEventListener("change", () => {
+    selectedCountryCodes.clear();
+    refreshCountryFilterUI();
+    renderTable(getFilteredNodes());
+  });
+
+  sorted.forEach(([code, count]) => {
+    const option = createCountryOption(code, code, count);
+    fragment.appendChild(option.element);
+    countryCheckboxes.set(code, option.input);
+    option.input.addEventListener("change", () => {
+      if (option.input.checked) {
+        selectedCountryCodes.add(code);
+      } else {
+        selectedCountryCodes.delete(code);
+      }
+      refreshCountryFilterUI();
+      renderTable(getFilteredNodes());
+    });
+  });
+
+  countryFilterContainer.appendChild(fragment);
+  refreshCountryFilterUI();
+}
+
+function createCountryOption(code, label, count) {
+  const wrapper = document.createElement("label");
+  wrapper.className = "country-filter__option";
+  wrapper.tabIndex = 0;
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.value = code;
+  checkbox.className = "country-filter__checkbox";
+
+  const text = document.createElement("span");
+  text.className = "country-filter__label";
+  text.textContent = label;
+
+  const countBadge = document.createElement("span");
+  countBadge.className = "country-filter__count";
+  countBadge.textContent = String(count);
+
+  wrapper.append(checkbox, text, countBadge);
+  return { element: wrapper, input: checkbox };
+}
+
+function refreshCountryFilterUI() {
+  countryCheckboxes.forEach((input, code) => {
+    if (code === "__all__") {
+      input.checked = selectedCountryCodes.size === 0;
+    } else {
+      input.checked = selectedCountryCodes.has(code);
+    }
+  });
+  updateCountryToggleLabel();
+}
+
+function onTableRowClick(event) {
+  const link = event.target.closest('.sid-link');
+  if (!link) return; // 只有點 SID 欄位才作用
+  event.preventDefault();
+  window.open(link.href, "_blank", "noopener,noreferrer");
+}
+
+function updateCountryToggleLabel() {
+  const count = selectedCountryCodes.size;
+  const label = count === 0 ? "國家前綴（全部）" : `國家前綴（已選 ${count}）`;
+  countryToggle.textContent = label;
+  countryToggle.setAttribute("aria-expanded", String(isCountryPanelOpen));
+}
+
+function renderTable(data) {
+  tableBody.innerHTML = "";
+  if (!data.length) {
+    clearRowObserver();
+    setTablePlaceholder("找不到符合條件的節點。");
+    return;
+  }
+
+  const sorted = sortForDisplay(data);
+  clearRowObserver();
+  const fragment = document.createDocumentFragment();
+  const rowsToObserve = [];
+
+  sorted.forEach((node) => {
+    const row = createRow(node);
+    fragment.appendChild(row);
+    rowsToObserve.push(row);
+  });
+
+  tableBody.appendChild(fragment);
+  rowsToObserve.forEach((row) => observeRow(row));
+}
+
+function createRow(node) {
+  const row = document.createElement("tr");
+  row.dataset.sid = String(node.sid);
+  row.dataset.location = node.locationRegion || node.location;
+  row.dataset.hostname = node.hostname;
+  row.dataset.country = node.countryCode;
+  row.dataset.provider = node.provider || "";
+  row.tabIndex = 0;
+
+  const metrics = globalMetrics.get(String(node.sid)) ?? null;
+  const region = node.locationRegion || node.location;
+  const provider = node.provider || "—";
+  row.innerHTML = `
+    <td>${region}</td>
+    <td>${provider}</td>
+    <td>${node.ip}</td>
+    <td class="sid-cell"><a class="sid-link" href="https://mudfish.net/admin/serverstatus/${node.sid}" target="_blank" rel="noopener noreferrer">${node.sid}</a></td>
+    <td class="metric-cell" data-metric="cpuLoad">${renderMetricValue(metrics?.cpuLoadText, "cpuLoad")}</td>
+    <td class="metric-cell" data-metric="ioWait">${renderMetricValue(metrics?.ioWaitText, "ioWait")}</td>
+    <td class="metric-cell" data-metric="nicError">${renderMetricValue(metrics?.nicErrorText, "nicError")}</td>
+    <td class="metric-cell" data-metric="network">${renderMetricValue(metrics?.networkText, "network")}</td>
+    <td class="metric-cell" data-metric="congestion">${renderMetricValue(metrics?.congestionText, "congestion")}</td>
+  `;
+
+  applyRowSortDataset(row, metrics);
+  return row;
+}
+
+function renderMetricValue(value, key) {
+  if (value === null || value === undefined) {
+    return '<span class="metric-cell__placeholder">—</span>';
+  }
+  const raw = String(value).trim();
+  if (!raw || raw === '—') {
+    return '<span class="metric-cell__placeholder">—</span>';
+  }
+  const needsUnit = key === 'network' && /^[\d.]+$/.test(raw);
+  const text = needsUnit ? `${raw} MB` : raw;
+  return `<span class="metric-value metric-value--${key}">${text}</span>`;
+}
+
+
+function applyRowSortDataset(row, metrics) {
+  row.dataset.sortCpuLoad = metrics && Number.isFinite(metrics.cpuLoadValue)
+    ? String(metrics.cpuLoadValue)
+    : String(Number.MAX_SAFE_INTEGER);
+  row.dataset.sortIoWait = metrics && Number.isFinite(metrics.ioWaitValue)
+    ? String(metrics.ioWaitValue)
+    : String(Number.MAX_SAFE_INTEGER);
+  row.dataset.sortNicError = metrics && Number.isFinite(metrics.nicErrorValue)
+    ? String(metrics.nicErrorValue)
+    : String(Number.MAX_SAFE_INTEGER);
+  row.dataset.sortNetwork = metrics && Number.isFinite(metrics.networkValue)
+    ? String(metrics.networkValue)
+    : String(Number.MAX_SAFE_INTEGER);
+  row.dataset.sortCongestion = metrics && Number.isFinite(metrics.congestionValue)
+    ? String(metrics.congestionValue)
+    : String(Number.MAX_SAFE_INTEGER);
+}
+
+
+function setTablePlaceholder(message) {
+  tableBody.innerHTML = `
+    <tr>
+      <td colspan="9" class="status-table__placeholder">${message}</td>
+    </tr>
+  `;
+}
+
+function sortNodes(list) {
+  return [...list].sort((a, b) => {
+    const locA = a.locationRegion || a.location || "";
+    const locB = b.locationRegion || b.location || "";
+    const locationCompare = locA.localeCompare(locB, "zh-Hant");
+    if (locationCompare !== 0) {
+      return locationCompare;
+    }
+    return a.hostname.localeCompare(b.hostname, "zh-Hant");
+  });
+}
+
+function sortForDisplay(list) {
+  const extractor = SORTERS[sortState.key] ?? SORTERS.region;
+  const sorted = [...list].sort((a, b) => {
+    const valueA = extractor(a);
+    const valueB = extractor(b);
+    return compareValues(valueA, valueB);
+  });
+  if (sortState.direction === "desc") {
+    sorted.reverse();
+  }
+  return sorted;
+}
+
+function compareValues(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    return a - b;
+  }
+  if (typeof a === "string" && typeof b === "string") {
+    return a.localeCompare(b, "zh-Hant", { sensitivity: "base" });
+  }
+  return String(a).localeCompare(String(b));
+}
+
+async function showHoverForRow(row, position) {
+  const sid = row.dataset.sid;
+  if (!sid) {
+    return;
+  }
+  activeRow = row;
+
+  const baseNode = nodeLookup.get(sid);
+  if (!baseNode) {
+    return;
+  }
+
+  hoverCard.hidden = false;
+  updateHoverCardContent({
+    title: baseNode.hostname,
+    subtitle: baseNode.location,
+    details: [
+      { label: "IPv4", value: baseNode.ip },
+      { label: "節點 SID", value: String(baseNode.sid) },
+      { label: "狀態", value: "正在擷取詳細資料…" },
+    ],
+    footer: "首次載入約需 1-2 秒",
+  });
+
+  const anchor = position ?? lastPointerPosition ?? getRowViewportCenter(row);
+  positionHoverCard(anchor);
+
+  try {
+    const detail = await getServerDetail(sid);
+    if (activeRow !== row) {
+      return;
+    }
+    const detailRows = buildDetailRows(baseNode, detail);
+    const footerText = detail.fetchedAt
+      ? `資料擷取時間：${formatTime(detail.fetchedAt)}`
+      : "即時資料來源：Mudfish";
+
+    updateHoverCardContent({
+      title: baseNode.hostname,
+      subtitle: baseNode.location,
+      details: detailRows,
+      footer: footerText,
+    });
+    const updatedAnchor = lastPointerPosition ?? anchor ?? getRowViewportCenter(row);
+    positionHoverCard(updatedAnchor);
+  } catch (error) {
+    if (activeRow !== row) {
+      return;
+    }
+    console.error(`載入節點 ${sid} 詳細資料失敗`, error);
+    updateHoverCardContent({
+      title: baseNode.hostname,
+      subtitle: baseNode.location,
+      details: [
+        { label: "IPv4", value: baseNode.ip },
+        { label: "節點 SID", value: String(baseNode.sid) },
+        { label: "狀態", value: "無法取得詳細資料" },
+      ],
+      footer: "請稍後再試或檢查網路連線",
+    });
+    const fallbackAnchor = lastPointerPosition ?? anchor ?? getRowViewportCenter(row);
+    positionHoverCard(fallbackAnchor);
+  }
+}
+
+function hideHoverCard() {
+  activeRow = null;
+  hoverCard.hidden = true;
+}
+
+function positionHoverCard(position) {
+  if (!position) {
+    return;
+  }
+  const offset = 18;
+  const viewportPadding = 12;
+  const rect = hoverCard.getBoundingClientRect();
+  let left = position.x + offset;
+  let top = position.y + offset;
+
+  if (left + rect.width + viewportPadding > window.innerWidth) {
+    left = position.x - rect.width - offset;
+  }
+  if (left < viewportPadding) {
+    left = viewportPadding;
+  }
+
+  if (top + rect.height + viewportPadding > window.innerHeight) {
+    top = position.y - rect.height - offset;
+  }
+  if (top < viewportPadding) {
+    top = viewportPadding;
+  }
+
+  hoverCard.style.left = `${Math.round(left)}px`;
+  hoverCard.style.top = `${Math.round(top)}px`;
+}
+
+function getRowViewportCenter(row) {
+  const rect = row.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
+}
+
+function updateHoverCardContent({ title, subtitle, details, footer }) {
+  const fragment = hoverCardTemplate.content.cloneNode(true);
+  const titleEl = fragment.querySelector(".hover-card__title");
+  const subtitleEl = fragment.querySelector(".hover-card__subtitle");
+  const detailsEl = fragment.querySelector(".hover-card__details");
+  const footerEl = fragment.querySelector(".hover-card__footer");
+
+  titleEl.textContent = title ?? "";
+  subtitleEl.textContent = subtitle ?? "";
+
+  detailsEl.innerHTML = "";
+  if (Array.isArray(details) && details.length) {
+    details.forEach((entry) => {
+      const item = Array.isArray(entry)
+        ? { label: entry[0], value: entry[1] }
+        : entry;
+      if (!item) {
+        return;
+      }
+      const dt = document.createElement("dt");
+      dt.textContent = item.label ?? "";
+      const dd = document.createElement("dd");
+      appendDetailValue(dd, item.value);
+      detailsEl.appendChild(dt);
+      detailsEl.appendChild(dd);
+    });
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className = "hover-card__placeholder";
+    placeholder.textContent = "暫無詳細資料";
+    detailsEl.appendChild(placeholder);
+  }
+
+  footerEl.textContent = footer ?? "";
+
+  hoverCard.innerHTML = "";
+  hoverCard.appendChild(fragment);
+}
+
+function appendDetailValue(container, value) {
+  if (value && typeof value === "object" && value.type === "image") {
+    const img = document.createElement("img");
+    img.src = value.src;
+    img.alt = value.alt ?? value.label ?? "圖表";
+    img.loading = "lazy";
+    container.appendChild(img);
+    if (value.caption) {
+      const caption = document.createElement("div");
+      caption.textContent = value.caption;
+      container.appendChild(caption);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    container.textContent = formatDetailValue(value.join("\n"));
+    return;
+  }
+  container.textContent = formatDetailValue(value);
+}
+
+function formatDetailValue(value) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || "—";
+  }
+  return String(value);
+}
+
+async function getServerDetail(sid) {
+  if (detailCache.has(sid)) {
+    return detailCache.get(sid);
+  }
+  if (pendingDetailRequests.has(sid)) {
+    return pendingDetailRequests.get(sid);
+  }
+
+  const request = fetch(NODE_DETAIL_ENDPOINT(sid))
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`取得節點 ${sid} 詳細資料失敗：${response.status}`);
+      }
+      return response.text();
+    })
+    .then((html) => {
+      const detail = parseServerStatusHtml(html);
+      detail.fetchedAt = new Date();
+      detailCache.set(sid, detail);
+      pendingDetailRequests.delete(sid);
+      updateRowWithDetail(sid, detail);
+      return detail;
+    })
+    .catch((error) => {
+      pendingDetailRequests.delete(sid);
+      throw error;
+    });
+
+  pendingDetailRequests.set(sid, request);
+  return request;
+}
+
+function updateRowWithDetail(sid) {
+  const row = tableBody.querySelector(`tr[data-sid="${sid}"]`);
+  if (!row) {
+    return;
+  }
+  const metrics = globalMetrics.get(String(sid)) ?? null;
+  applyRowSortDataset(row, metrics);
+}
+
+// Helpers for parsing list-based labels/values in server status panel
+function getListItemLabel(li) {
+  if (!li) return "";
+  const clone = li.cloneNode(true);
+  // remove nested lists and images to avoid value noise
+  clone.querySelectorAll("ul,ol,img").forEach((el) => el.remove());
+  const strong = clone.querySelector("strong, b");
+  let text = normalizeText(clone.textContent || "");
+  if (strong && normalizeText(strong.textContent)) {
+    return normalizeText(strong.textContent);
+  }
+  const colonMatch = text.match(/^([^:：]+)[:：]/);
+  if (colonMatch) {
+    return normalizeText(colonMatch[1]);
+  }
+  // fallback: take first 16 chars as label-ish prefix
+  return normalizeText(text.split(/\s+/)[0] || text.slice(0, 16));
+}
+
+function getListItemValue(li) {
+  if (!li) return "";
+  const clone = li.cloneNode(true);
+  // remove nested lists; their content is handled separately
+  clone.querySelectorAll("ul,ol").forEach((el) => el.remove());
+  let text = normalizeText(clone.textContent || "");
+  const colonIndex = text.search(/[:：]/);
+  if (colonIndex !== -1) {
+    return normalizeText(text.slice(colonIndex + 1));
+  }
+  // if no colon, try removing bold label prefix if present
+  const strong = clone.querySelector("strong, b");
+  if (strong && normalizeText(strong.textContent)) {
+    const label = normalizeText(strong.textContent);
+    return normalizeText(text.replace(new RegExp(`^${label}\\s*`), ""));
+  }
+  return text;
+}
+
+function labelMatches(label, candidates) {
+  const l = normalizeText(label || "").toLowerCase();
+  return candidates.some((c) => {
+    const cc = normalizeText(String(c) || "").toLowerCase();
+    return l.includes(cc) || cc.includes(l);
+  });
+}
+
+function parseServerStatusHtml(htmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlText, "text/html");
+  const panel = doc.querySelector(".panel.panel-info .panel-body");
+  if (!panel) {
+    throw new Error("未能解析伺服器狀態面板");
+  }
+
+  const topLevelItems = Array.from(panel.querySelectorAll(":scope > ul > li"));
+  const detail = {
+    uptime: "",
+    heartbeat: "",
+    privateIp: "",
+    pricePolicy: [],
+    metrics: {},
+  };
+
+  // 優先用固定順序的第 N 個 <li> 取值，避免語言差異造成解析失敗
+  if (topLevelItems.length >= 5) {
+    // 0: Hostname, 1: IPv4, 2: Private IP, 3: Uptime, 4: Heartbeat
+    detail.privateIp = detail.privateIp || getListItemValue(topLevelItems[2]);
+    detail.uptime = detail.uptime || getListItemValue(topLevelItems[3]);
+    detail.heartbeat = detail.heartbeat || getListItemValue(topLevelItems[4]);
+  }
+
+  topLevelItems.forEach((item) => {
+    const label = getListItemLabel(item);
+    if (!label) {
+      return;
+    }
+    if (labelMatches(label, ["uptime", "運行時間"])) {
+      detail.uptime = getListItemValue(item);
+    } else if (labelMatches(label, ["heartbeat", "心跳"])) {
+      detail.heartbeat = getListItemValue(item);
+    } else if (labelMatches(label, ["private ip", "內部地址"])) {
+      detail.privateIp = getListItemValue(item);
+    } else if (labelMatches(label, ["price policy", "價格政策"])) {
+      const priceItems = Array.from(item.querySelectorAll("ul li"))
+        .map((li) => normalizeText(li.textContent ?? ""))
+        .filter(Boolean);
+      if (priceItems.length) {
+        detail.pricePolicy = priceItems;
+      }
+    }
+  });
+  // Fallbacks: 某些節點的標記格式略有差異，保險起見再嘗試一次
+  if (!detail.uptime) {
+    const uptimeLi = topLevelItems.find((li) => /uptime|運行時間/i.test(li.textContent || ""));
+    if (uptimeLi) {
+      const badge = uptimeLi.querySelector('.badge');
+      const raw = badge ? badge.textContent : uptimeLi.textContent;
+      const text = normalizeText(raw || "");
+      // 去掉前綴標籤
+      detail.uptime = normalizeText(text.replace(/^(?:uptime|運行時間)[:：]?\s*/i, ""));
+    }
+  }
+
+  if (!detail.privateIp) {
+    const privLi = topLevelItems.find((li) => /private\s*ip|內部地址/i.test(li.textContent || ""));
+    if (privLi) {
+      const text = normalizeText(privLi.textContent || "");
+      detail.privateIp = normalizeText(text.replace(/^(?:private\s*ip|內部地址)[:：]?\s*/i, ""));
+    }
+  }
+
+
+  if (!detail.pricePolicy.length) {
+    detail.pricePolicy = Array.from(panel.querySelectorAll("ul > li ul li"))
+      .map((li) => normalizeText(li.textContent ?? ""))
+      .filter((text) => text && !/\.png$/i.test(text));
+  }
+
+  collectMetricImages(panel, detail.metrics);
+
+
+  return detail;
+}
+
+function collectMetricImages(panel, metricStore) {
+  const images = Array.from(panel.querySelectorAll("img[src*='mongraph']"));
+  images.forEach((img) => {
+    const src = toAbsoluteUrl(img.getAttribute("src"));
+    const title = resolveMetricTitle(img);
+    const key = resolveMetricKeyFromSource(src, title);
+    if (!key) {
+      return;
+    }
+    metricStore[key] = {
+      label: METRIC_LABELS[key],
+      image: src,
+      sortScore: computeMetricSortScore(src),
+    };
+  });
+}
+
+function resolveMetricTitle(img) {
+  const container = img.closest("li") ?? img.parentElement;
+  const clone = container ? container.cloneNode(true) : null;
+  if (clone) {
+    const nestedList = clone.querySelector("ul");
+    if (nestedList) {
+      nestedList.remove();
+    }
+  }
+  return normalizeText(clone?.textContent ?? "");
+}
+
+function resolveMetricKeyFromSource(src, title) {
+  if (/loadavg/i.test(src)) {
+    return "congestion";
+  }
+  if (/eth0|traffic|io/i.test(src)) {
+    return "network";
+  }
+  if (/proc|system/i.test(src) || /cpu/i.test(src)) {
+    return "systemLoad";
+  }
+
+  const matchedEntry = Object.entries(METRIC_IMAGE_LABELS).find(([, label]) =>
+    label && title && title.toLowerCase().includes(label.toLowerCase())
+  );
+  return matchedEntry?.[0] ?? null;
+}
+
+function normalizeText(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function extractValueFromText(source, labels) {
+  const labelPattern = Array.isArray(labels)
+    ? labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
+    : labels;
+  const regex = new RegExp(`(?:${labelPattern})[:：]?`, "i");
+  const value = source.replace(regex, "").trim();
+  return value || "—";
+}
+
+function buildDetailRows(baseNode, detail) {
+  const rows = [
+    { label: "IPv4", value: baseNode.ip },
+    { label: "內部地址", value: detail.privateIp || "—" },
+    { label: "運行時間", value: detail.uptime || "—" },
+    { label: "心跳", value: detail.heartbeat || "—" },
+  ];
+
+  if (detail.pricePolicy?.length) {
+    rows.push({ label: "價格政策", value: detail.pricePolicy.join("\n") });
+  }
+
+  const aggregated = globalMetrics.get(String(baseNode.sid));
+  if (aggregated) {
+    rows.push({ label: "CPU %", value: aggregated.cpuLoadText ?? "—" });
+    rows.push({ label: "IO 等待 %", value: aggregated.ioWaitText ?? "—" });
+    rows.push({ label: "網卡錯誤數", value: aggregated.nicErrorText ?? "—" });
+    rows.push({ label: "流量 (MB)", value: aggregated.networkText ?? "—" });
+    rows.push({ label: "擁擠度", value: aggregated.congestionText ?? "—" });
+  }
+
+  const metrics = detail.metrics ?? {};
+  [
+    ["systemLoad", metrics.systemLoad],
+    ["network", metrics.network],
+    ["congestion", metrics.congestion],
+  ].forEach(([key, metric]) => {
+    if (!metric?.image) {
+      return;
+    }
+    rows.push({
+      label: METRIC_IMAGE_LABELS[key],
+      value: { type: "image", src: metric.image, alt: METRIC_IMAGE_LABELS[key] },
+    });
+  });
+
+  return rows;
+}
+
+function formatTime(date) {
+  return new Intl.DateTimeFormat("zh-TW", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+function splitLocationParts(fullLocation) {
+  const text = fullLocation || "";
+  const m = text.match(/^(.+?)\s*\((.+)\)\s*$/);
+  if (m) {
+    return { region: m[1].trim(), provider: m[2].trim() };
+  }
+  return { region: text.trim(), provider: "" };
+}
+
+function deriveProviderBrand(provider) {
+  const raw = (provider || "").trim();
+  if (!raw) return "";
+  const s = raw.toLowerCase();
+  if (s.includes("google")) return "Google";
+  if (s.includes("amazon") || s.includes("aws")) return "Amazon";
+  if (s.includes("azure") || s.includes("microsoft")) return "Azure";
+  if (s.includes("lightnode")) return "LightNode";
+  if (s.includes("linode")) return "Linode";
+  if (s.includes("digitalocean") || /\bdo\b/.test(s)) return "DigitalOcean";
+  if (s.includes("vultr")) return "Vultr";
+  // fallback: 取最後一段並去除數字尾碼（如 "Google 4" -> "Google"）
+  const parts = raw.split("-");
+  const last = parts[parts.length - 1].trim();
+  return last.replace(/\s+\d+$/, "");
+}
+
+function enrichNode(node) {
+  const { region, provider } = splitLocationParts(node.location);
+  const providerBrand = deriveProviderBrand(provider);
+  return {
+    ...node,
+    locationRegion: region,
+    provider,
+    providerBrand,
+    countryCode: deriveCountryCode({ ...node, location: region }),
+  };
+}
+
+function deriveCountryCode(node) {
+  const hostMatch = node.hostname?.match(/^node-([a-z]{2})-/i);
+  if (hostMatch) {
+    return hostMatch[1].toUpperCase();
+  }
+  const locationMatch = node.location?.match(/^([A-Z]{2})\s/);
+  if (locationMatch) {
+    return locationMatch[1].toUpperCase();
+  }
+  return "??";
+}
+
+function parseGlobalStatusHtml(htmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlText, "text/html");
+  const rows = Array.from(doc.querySelectorAll("#staticnodes_table tbody tr"));
+  const metrics = new Map();
+
+  rows.forEach((row) => {
+    const cells = row.querySelectorAll("td");
+    if (cells.length < 5) {
+      return;
+    }
+    const onClick = cells[1].getAttribute("onClick") || "";
+    const sidMatch = onClick.match(/openStatusWindow\((\d+)\)/i);
+    if (!sidMatch) {
+      return;
+    }
+    const sid = sidMatch[1];
+    const systemLoadRaw = normalizeText(cells[2].textContent || "").replace(/\s+/g, "");
+    const trafficRaw = normalizeText(cells[3].textContent || "");
+    const congestionRaw = normalizeText(cells[4].textContent || "");
+
+    const tuple = parseSystemLoadTuple(systemLoadRaw);
+    const networkValue = parseFloat(trafficRaw.replace(/[^\d.\-]/g, ""));
+    const congestionValue = parseFloat(congestionRaw.replace(/[^\d.\-]/g, ""));
+
+    metrics.set(sid, {
+      cpuLoadText: tuple[0]?.text ?? null,
+      cpuLoadValue: tuple[0]?.value ?? null,
+      ioWaitText: tuple[1]?.text ?? null,
+      ioWaitValue: tuple[1]?.value ?? null,
+      nicErrorText: tuple[2]?.text ?? null,
+      nicErrorValue: tuple[2]?.value ?? null,
+      networkText: trafficRaw || null,
+      networkValue: Number.isFinite(networkValue) ? networkValue : null,
+      congestionText: congestionRaw || null,
+      congestionValue: Number.isFinite(congestionValue) ? congestionValue : null,
+    });
+  });
+
+  return metrics;
+}
+
+function parseSystemLoadTuple(text) {
+  if (!text) {
+    return [];
+  }
+  const rawParts = text.split("/");
+  const labels = ["CPU %", "IO %", "NIC"];
+  const keys = ["cpu", "io", "nic"];
+  return rawParts.map((part, index) => {
+    const cleaned = part.replace(/<[^>]*>/g, "").trim();
+    const numeric = parseFloat(cleaned.replace(/[^\d.\-]/g, ""));
+    return {
+      key: keys[index] ?? `part${index}`,
+      text: cleaned || "—",
+      value: Number.isFinite(numeric) ? numeric : null,
+      label: labels[index] ?? `Part ${index + 1}`,
+    };
+  });
+}
+
+function getGlobalMetricSortValue(sid, key) {
+  const metrics = globalMetrics.get(String(sid));
+  if (!metrics) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  switch (key) {
+    case "cpuLoad":
+      return Number.isFinite(metrics.cpuLoadValue) ? metrics.cpuLoadValue : Number.MAX_SAFE_INTEGER;
+    case "ioWait":
+      return Number.isFinite(metrics.ioWaitValue) ? metrics.ioWaitValue : Number.MAX_SAFE_INTEGER;
+    case "nicError":
+      return Number.isFinite(metrics.nicErrorValue) ? metrics.nicErrorValue : Number.MAX_SAFE_INTEGER;
+    case "network":
+      return Number.isFinite(metrics.networkValue) ? metrics.networkValue : Number.MAX_SAFE_INTEGER;
+    case "congestion":
+      return Number.isFinite(metrics.congestionValue) ? metrics.congestionValue : Number.MAX_SAFE_INTEGER;
+    default:
+      return Number.MAX_SAFE_INTEGER;
+  }
+}
+
+function toAbsoluteUrl(url) {
+  if (!url) {
+    return "";
+  }
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  if (url.startsWith("//")) {
+    return `https:${url}`;
+  }
+  return url;
+}
+
+function computeMetricSortScore(url) {
+  if (!url) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const match = url.match(/\/(\d+)_/);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return Number.MAX_SAFE_INTEGER - 5;
+}
+
+function ensureRowObserver() {
+  if (!rowObserver) {
+    rowObserver = new IntersectionObserver(handleRowIntersection, {
+      root: null,
+      threshold: 0.2,
+    });
+  }
+}
+
+function observeRow(row) {
+  if (!row) {
+    return;
+  }
+  ensureRowObserver();
+  rowObserver.observe(row);
+}
+
+function clearRowObserver() {
+  if (rowObserver) {
+    rowObserver.disconnect();
+  }
+}
+
+function handleRowIntersection(entries) {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) {
+      return;
+    }
+    const row = entry.target;
+    const sid = row.dataset.sid;
+    if (!sid) {
+      return;
+    }
+    rowObserver.unobserve(row);
+    getServerDetail(sid).catch(() => {
+      /* 詳細資料抓取失敗時在 getServerDetail 已處理錯誤 */
+    });
+  });
+}
+
+
+
+
+
+
+
