@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mudfish 全球節點地圖</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/png" href="mud.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+</head>
+<body>
+  <main class="page page--map">
+    <header class="page__header">
+      <h1 class="page__title">Mudfish 全球節點地圖</h1>
+      <p class="page__subtitle">以 OpenStreetMap 與 Leaflet 即時檢視 Mudfish 伺服器位置與健康狀態。</p>
+      <a class="page__link-back" href="index.html">← 返回表格儀表板</a>
+    </header>
+
+    <section class="map-shell" aria-label="全球伺服器地圖">
+      <div class="map-shell__main">
+        <div id="mapView" class="map-view" role="region" aria-label="伺服器地圖"></div>
+      </div>
+      <aside class="map-shell__sidebar" aria-label="節點詳情">
+        <header class="map-sidebar__header">
+          <h2 class="map-sidebar__title">節點清單</h2>
+          <p class="map-sidebar__subtitle" id="mapSidebarHint">點擊地圖上的國家節點以檢視城市與伺服器明細</p>
+          <div id="mapSelection" class="map-selection" aria-live="polite">
+            <span class="map-selection__label" data-selection-label>尚未選取國家</span>
+            <span class="map-selection__count" data-selection-count>—</span>
+          </div>
+        </header>
+        <div id="mapList" class="map-city-list" role="list"></div>
+      </aside>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="js/map.js" type="module"></script>
+</body>
+</html>
+
+
+
+
+
