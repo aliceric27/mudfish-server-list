@@ -105,6 +105,7 @@ async function bootstrap() {
     getDisplaySortExtractor: (key) => SORTERS[key] ?? SORTERS.region,
     getFilteredNodes: Filters.getFilteredNodes,
     getServerDetailCached,
+    getDetail: (sid) => detailCache.get(String(sid)),
     onSortChanged: () => {
       const list = Filters.getFilteredNodes();
       Table.renderTable(list);
@@ -462,13 +463,8 @@ async function getServerDetailCached(sid) {
   return request;
 }
 
-function updateRowWithDetail(sid) {
-  const row = tableBody.querySelector(`tr[data-sid="${sid}"]`);
-  if (!row) {
-    return;
-  }
-  const metrics = globalMetrics.get(String(sid)) ?? null;
-  Table.applyRowSortDataset(row, metrics);
+function updateRowWithDetail(sid, detail) {
+  Table.updateRowRuntime(sid, detail?.uptime);
 }
 
 // Helpers for parsing list-based labels/values in server status panel

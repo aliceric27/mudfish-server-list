@@ -9,6 +9,7 @@ let deps = {
   getDisplaySortExtractor: (_key) => (n) => n,
   getFilteredNodes: () => [],
   getServerDetailCached: (_sid) => Promise.resolve(),
+  getDetail: (_sid) => null,
 };
 
 let rowObserver = null;
@@ -29,6 +30,79 @@ function renderMetricValue(value, key) {
   const needsUnit = key === 'network' && /^[\d.]+$/.test(raw);
   const text = needsUnit ? `${raw} MB` : raw;
   return `<span class="metric-value metric-value--${key}">${text}</span>`;
+}
+
+function getDetailForSid(sid) {
+  if (!sid) return null;
+  try {
+    return deps.getDetail?.(String(sid)) ?? null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function formatUptimeText(uptime) {
+  if (uptime === null || uptime === undefined) return '—';
+  const text = String(uptime).trim();
+  return text || '—';
+}
+
+function computeUptimeSortValue(uptime) {
+  if (uptime === null || uptime === undefined) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const text = String(uptime).trim();
+  if (!text) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  let totalSeconds = 0;
+  const lower = text.toLowerCase();
+  const normalized = lower.replace(/[，,]+/g, ' ');
+
+  [
+    [/(\d+)\s*(?:day|days|d)\b/, 86400],
+    [/(\d+)\s*(?:hour|hours|hr|hrs|h)\b/, 3600],
+    [/(\d+)\s*(?:minute|minutes|min|mins|m)\b/, 60],
+    [/(\d+)\s*(?:second|seconds|sec|secs|s)\b/, 1],
+  ].forEach(([regex, factor]) => {
+    const match = normalized.match(regex);
+    if (match) totalSeconds += parseInt(match[1], 10) * factor;
+  });
+
+  const localeText = text.replace(/[，,]+/g, ' ');
+
+  [
+    [/(\d+)\s*天/, 86400],
+    [/(\d+)\s*(?:小時|時)/, 3600],
+    [/(\d+)\s*(?:分鐘|分)/, 60],
+    [/(\d+)\s*秒/, 1],
+  ].forEach(([regex, factor]) => {
+    const match = localeText.match(regex);
+    if (match) totalSeconds += parseInt(match[1], 10) * factor;
+  });
+
+  const hmsMatch = text.match(/(\d{1,3})\s*:\s*(\d{1,2})\s*:\s*(\d{1,2})/);
+  if (hmsMatch) {
+    totalSeconds += parseInt(hmsMatch[1], 10) * 3600;
+    totalSeconds += parseInt(hmsMatch[2], 10) * 60;
+    totalSeconds += parseInt(hmsMatch[3], 10);
+  }
+
+  if (totalSeconds > 0) {
+    return totalSeconds;
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function setRowUptime(row, uptime) {
+  if (!row) return;
+  const span = row.querySelector('.runtime-cell__value');
+  if (span) {
+    span.textContent = formatUptimeText(uptime);
+  }
+  row.dataset.sortUptime = String(computeUptimeSortValue(uptime));
 }
 
 export function applyRowSortDataset(row, metrics) {
@@ -71,6 +145,7 @@ export function createRow(node) {
     <td class="metric-cell" data-metric="nicError">${renderMetricValue(metrics?.nicErrorText, "nicError")}</td>
     <td class="metric-cell" data-metric="network">${renderMetricValue(metrics?.networkText, "network")}</td>
     <td class="metric-cell" data-metric="congestion">${renderMetricValue(metrics?.congestionText, "congestion")}</td>
+    <td class="runtime-cell"><span class="runtime-cell__value">—</span></td>
   `;
 
   const regionSpan = row.querySelector('.region-cell .truncate-15ch');
@@ -80,6 +155,8 @@ export function createRow(node) {
   }
 
   applyRowSortDataset(row, metrics);
+  const detail = getDetailForSid(node.sid);
+  setRowUptime(row, detail?.uptime);
   return row;
 }
 
@@ -108,13 +185,26 @@ export function updateRowContent(row, node) {
   if (tds[7]) tds[7].innerHTML = renderMetricValue(metrics?.networkText, "network");
   if (tds[8]) tds[8].innerHTML = renderMetricValue(metrics?.congestionText, "congestion");
 
+  const detail = getDetailForSid(node.sid);
+  setRowUptime(row, detail?.uptime);
+
+  applyRowSortDataset(row, metrics);
+}
+
+export function updateRowRuntime(sid, uptime) {
+  if (!deps.tableBody) return;
+  const row = deps.tableBody.querySelector(`tr[data-sid="${sid}"]`);
+  if (!row) return;
+  const resolved = uptime ?? getDetailForSid(sid)?.uptime;
+  setRowUptime(row, resolved);
+  const metrics = deps.globalMetrics.get(String(sid)) ?? null;
   applyRowSortDataset(row, metrics);
 }
 
 export function setTablePlaceholder(message) {
   deps.tableBody.innerHTML = `
     <tr>
-      <td colspan="9" class="status-table__placeholder">${message}</td>
+      <td colspan="10" class="status-table__placeholder">${message}</td>
     </tr>
   `;
 }
