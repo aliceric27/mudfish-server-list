@@ -232,6 +232,7 @@ export async function showHoverForRow(row, position) {
       { label: deps.t?.('hover.labels.status'), value: deps.t?.('hover.fetching') },
     ],
     footer: deps.t?.('hover.firstLoadHint'),
+    isLoading: true,
   });
 
   const anchor = position ?? lastPointerPosition ?? getRowViewportCenter(row);
@@ -250,6 +251,7 @@ export async function showHoverForRow(row, position) {
       subtitle: baseNode.location,
       details: detailRows,
       footer: footerText,
+      isLoading: false,
     });
     const updatedAnchor = lastPointerPosition ?? anchor ?? getRowViewportCenter(row);
     positionHoverCard(updatedAnchor);
@@ -264,6 +266,7 @@ export async function showHoverForRow(row, position) {
         { label: deps.t?.('hover.labels.status'), value: deps.t?.('hover.fetchFailed') },
       ],
       footer: deps.t?.('hover.retryLater'),
+      isLoading: false,
     });
     const fallbackAnchor = lastPointerPosition ?? anchor ?? getRowViewportCenter(row);
     positionHoverCard(fallbackAnchor);
@@ -302,13 +305,14 @@ function getRowViewportCenter(row) {
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 }
 
-function updateHoverCardContent({ title, subtitle, details, footer }) {
+function updateHoverCardContent({ title, subtitle, details, footer, isLoading = false }) {
   if (!deps.hoverCardTemplate || !deps.hoverCard) return;
   const fragment = deps.hoverCardTemplate.content.cloneNode(true);
   const titleEl = fragment.querySelector('.hover-card__title');
   const subtitleEl = fragment.querySelector('.hover-card__subtitle');
   const detailsEl = fragment.querySelector('.hover-card__details');
   const footerEl = fragment.querySelector('.hover-card__footer');
+  const spinnerEl = fragment.querySelector('.hover-card__spinner');
 
   if (titleEl) titleEl.textContent = title ?? '';
   if (subtitleEl) subtitleEl.textContent = subtitle ?? '';
@@ -318,8 +322,14 @@ function updateHoverCardContent({ title, subtitle, details, footer }) {
 
   footerEl.textContent = footer ?? '';
 
+  if (spinnerEl) {
+    spinnerEl.hidden = !isLoading;
+    spinnerEl.setAttribute('aria-hidden', 'true');
+  }
+
   deps.hoverCard.innerHTML = '';
   deps.hoverCard.appendChild(fragment);
+  deps.hoverCard.classList.toggle('hover-card--loading', Boolean(isLoading));
 }
 
 function appendDetailValue(container, value, label) {

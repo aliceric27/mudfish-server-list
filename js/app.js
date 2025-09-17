@@ -34,6 +34,8 @@ const pendingDetailRequests = new Map();
 const globalMetrics = new Map();
 const selectedCountryCodes = new Set();
 
+const DETAIL_TTL_MS = 60 * 60 * 1000; // 1 小時
+
 let sortState = { key: "region", direction: "asc" };
 function buildFiltersSnapshot() {
   return {
@@ -105,7 +107,6 @@ async function bootstrap() {
     getDisplaySortExtractor: (key) => SORTERS[key] ?? SORTERS.region,
     getFilteredNodes: Filters.getFilteredNodes,
     getServerDetailCached,
-    getDetail: (sid) => detailCache.get(String(sid)),
     onSortChanged: () => {
       const list = Filters.getFilteredNodes();
       Table.renderTable(list);
@@ -298,6 +299,26 @@ function mergeGlobalMetrics(metricsMap) {
   });
 }
 
+function toSidKey(sid) {
+  return typeof sid === 'string' ? sid : String(sid);
+}
+
+function ensureDetailTimestamp(detail) {
+  if (!detail) return null;
+  if (!(detail.fetchedAt instanceof Date)) {
+    detail.fetchedAt = detail.fetchedAt ? new Date(detail.fetchedAt) : new Date();
+  }
+  return detail;
+}
+
+function isDetailStale(detail) {
+  const normalized = ensureDetailTimestamp(detail);
+  if (!normalized?.fetchedAt) return true;
+  const ts = normalized.fetchedAt.getTime();
+  if (!Number.isFinite(ts)) return true;
+  return (Date.now() - ts) > DETAIL_TTL_MS;
+}
+
 // 依使用者 IP 自動推測語言（KR->ko, JP->ja, HK/TW/CN->zh, 其他->en）
 async function detectLanguageByIP({ timeoutMs = 1500 } = {}) {
   const controller = new AbortController();
@@ -439,32 +460,49 @@ function onTableRowClick(event) {
 
 
 
-async function getServerDetailCached(sid) {
-  if (detailCache.has(sid)) {
-    return detailCache.get(sid);
+async function getServerDetailCached(sid, { forceRefresh = false } = {}) {
+  const key = toSidKey(sid);
+  const cached = detailCache.get(key) ?? detailCache.get(sid);
+
+  if (cached && !forceRefresh && !isDetailStale(cached)) {
+    detailCache.set(key, ensureDetailTimestamp(cached));
+    return cached;
   }
-  if (pendingDetailRequests.has(sid)) {
-    return pendingDetailRequests.get(sid);
+
+  const pendingKey = pendingDetailRequests.has(key)
+    ? key
+    : (pendingDetailRequests.has(sid) ? sid : null);
+
+  if (!forceRefresh && pendingKey !== null) {
+    return pendingDetailRequests.get(pendingKey);
   }
 
   const request = getServerDetailRaw(sid)
     .then((detail) => {
-      detailCache.set(sid, detail);
-      pendingDetailRequests.delete(sid);
-      updateRowWithDetail(sid, detail);
-      return detail;
+      const normalized = ensureDetailTimestamp(detail) ?? {};
+      detailCache.set(key, normalized);
+      if (key !== sid) {
+        detailCache.delete(sid);
+      }
+      pendingDetailRequests.delete(key);
+      if (key !== sid) {
+        pendingDetailRequests.delete(sid);
+      }
+      return normalized;
     })
     .catch((error) => {
-      pendingDetailRequests.delete(sid);
+      pendingDetailRequests.delete(key);
+      if (key !== sid) {
+        pendingDetailRequests.delete(sid);
+      }
       throw error;
     });
 
-  pendingDetailRequests.set(sid, request);
+  pendingDetailRequests.set(key, request);
+  if (key !== sid) {
+    pendingDetailRequests.delete(sid);
+  }
   return request;
-}
-
-function updateRowWithDetail(sid, detail) {
-  Table.updateRowRuntime(sid, detail?.uptime);
 }
 
 // Helpers for parsing list-based labels/values in server status panel
