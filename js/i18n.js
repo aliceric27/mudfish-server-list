@@ -16,16 +16,15 @@ export const I18N = {
     search: { label: '關鍵字搜尋', placeholder: '主機名或 IP', aria: '輸入主機名或 IP 搜尋' },
     country: { all: '國家前綴（全部）', selected: (n) => `國家前綴（已選 ${n}）` },
     load: { section: '系統負載篩選', aria: '系統負載數值篩選', cpu: 'CPU', io: 'IO', nic: '錯誤', congestion: '擁擠', any: '任意' },
-    buttons: { best: '最佳伺服器', reset: '重置篩選', ping: '檢測', pingAll: '檢測所有伺服器延遲' },
+    buttons: { best: '最佳伺服器', reset: '重置篩選' },
     table: {
-      headers: { region: '位置', provider: '供應商', ip: 'IPv4', sid: '節點 SID', cpu: 'CPU %', ioWait: 'IO 等待 %', nicError: '網卡錯誤數', network: '流量 (MB)', congestion: '擁擠度', ping: '延遲 (ms)' },
+      headers: { region: '位置', provider: '供應商', ip: 'IPv4', sid: '節點 SID', cpu: 'CPU %', ioWait: 'IO 等待 %', nicError: '網卡錯誤數', network: '流量 (MB)', congestion: '擁擠度' },
       loading: '正在載入資料…',
       empty: '找不到符合條件的節點。',
     },
     errors: { loadFailed: '無法取得伺服器資料，請稍後再試。' },
     metricLabels: { systemLoad: '系統負載', network: '流量', congestion: '擁擠度' },
     metricImageLabels: { systemLoad: '系統負載圖表', network: '流量趨勢圖', congestion: '擁擠度趨勢圖' },
-    ping: { testing: '測試中…', timeout: '逾時', na: '—' },
     usage: {
       heading: '使用方式',
       items: [
@@ -67,16 +66,15 @@ export const I18N = {
     search: { label: 'Search', placeholder: 'Hostname or IP', aria: 'Type hostname or IP to search' },
     country: { all: 'Country Prefix (All)', selected: (n) => `Country Prefix (Selected ${n})` },
     load: { section: 'System Load Filters', aria: 'System load value filters', cpu: 'CPU', io: 'IO', nic: 'Errors', congestion: 'Congestion', any: 'Any' },
-    buttons: { best: 'Best Server', reset: 'Reset Filters', ping: 'Test', pingAll: 'Test Latency For All' },
+    buttons: { best: 'Best Server', reset: 'Reset Filters' },
     table: {
-      headers: { region: 'Region', provider: 'Provider', ip: 'IPv4', sid: 'Node SID', cpu: 'CPU %', ioWait: 'IO Wait %', nicError: 'NIC Errors', network: 'Traffic (MB)', congestion: 'Congestion', ping: 'Latency (ms)' },
+      headers: { region: 'Region', provider: 'Provider', ip: 'IPv4', sid: 'Node SID', cpu: 'CPU %', ioWait: 'IO Wait %', nicError: 'NIC Errors', network: 'Traffic (MB)', congestion: 'Congestion' },
       loading: 'Loading…',
       empty: 'No matching nodes found.',
     },
     errors: { loadFailed: 'Failed to fetch data. Please try again later.' },
     metricLabels: { systemLoad: 'System Load', network: 'Traffic', congestion: 'Congestion' },
     metricImageLabels: { systemLoad: 'System Load Chart', network: 'Traffic Trend', congestion: 'Congestion Trend' },
-    ping: { testing: 'Testing…', timeout: 'Timeout', na: '—' },
     usage: {
       heading: 'How to Use',
       items: [
@@ -118,16 +116,15 @@ export const I18N = {
     search: { label: '検索', placeholder: 'ホスト名 または IP', aria: 'ホスト名または IP を入力' },
     country: { all: '国コード（すべて）', selected: (n) => `国コード（${n} 件選択）` },
     load: { section: 'システム負荷フィルター', aria: 'システム負荷の数値フィルター', cpu: 'CPU', io: 'IO', nic: 'エラー', congestion: '混雑度', any: '指定なし' },
-    buttons: { best: '最適サーバー', reset: 'フィルターをリセット', ping: 'テスト', pingAll: '全件レイテンシー測定' },
+    buttons: { best: '最適サーバー', reset: 'フィルターをリセット' },
     table: {
-      headers: { region: '位置', provider: 'プロバイダー', ip: 'IPv4', sid: 'ノード SID', cpu: 'CPU %', ioWait: 'IO 待機 %', nicError: 'NIC エラー数', network: 'トラフィック (MB)', congestion: '混雑度', ping: 'レイテンシー (ms)' },
+      headers: { region: '位置', provider: 'プロバイダー', ip: 'IPv4', sid: 'ノード SID', cpu: 'CPU %', ioWait: 'IO 待機 %', nicError: 'NIC エラー数', network: 'トラフィック (MB)', congestion: '混雑度' },
       loading: '読み込み中…',
       empty: '一致するノードがありません。',
     },
     errors: { loadFailed: 'データの取得に失敗しました。しばらくしてからお試しください。' },
     metricLabels: { systemLoad: 'システム負荷', network: 'トラフィック', congestion: '混雑度' },
     metricImageLabels: { systemLoad: 'システム負荷グラフ', network: 'トラフィック推移', congestion: '混雑度推移' },
-    ping: { testing: '計測中…', timeout: 'タイムアウト', na: '—' },
     usage: {
       heading: '使い方',
       items: [
@@ -169,16 +166,15 @@ export const I18N = {
     search: { label: '검색', placeholder: '호스트명 또는 IP', aria: '호스트명 또는 IP 입력' },
     country: { all: '국가 접두어(전체)', selected: (n) => `국가 접두어(${n}개 선택)` },
     load: { section: '시스템 부하 필터', aria: '시스템 부하 값 필터', cpu: 'CPU', io: 'IO', nic: '오류', congestion: '혼잡도', any: '제한 없음' },
-    buttons: { best: '최적 서버', reset: '필터 초기화', ping: '측정', pingAll: '모두 지연 측정' },
+    buttons: { best: '최적 서버', reset: '필터 초기화' },
     table: {
-      headers: { region: '위치', provider: '제공업체', ip: 'IPv4', sid: '노드 SID', cpu: 'CPU %', ioWait: 'IO 대기 %', nicError: 'NIC 오류 수', network: '트래픽 (MB)', congestion: '혼잡도', ping: '지연시간 (ms)' },
+      headers: { region: '위치', provider: '제공업체', ip: 'IPv4', sid: '노드 SID', cpu: 'CPU %', ioWait: 'IO 대기 %', nicError: 'NIC 오류 수', network: '트래픽 (MB)', congestion: '혼잡도' },
       loading: '로딩 중…',
       empty: '일치하는 노드가 없습니다.',
     },
     errors: { loadFailed: '데이터를 가져오지 못했습니다. 잠시 후 다시 시도하세요.' },
     metricLabels: { systemLoad: '시스템 부하', network: '트래픽', congestion: '혼잡도' },
     metricImageLabels: { systemLoad: '시스템 부하 차트', network: '트래픽 추이', congestion: '혼잡도 추이' },
-    ping: { testing: '측정 중…', timeout: '시간 초과', na: '—' },
     usage: {
       heading: '사용 방법',
       items: [
@@ -295,7 +291,6 @@ export function applyI18nStatic() {
     nicError: t('table.headers.nicError'),
     network: t('table.headers.network'),
     congestion: t('table.headers.congestion'),
-    ping: t('table.headers.ping'),
   };
   document.querySelectorAll('#serverTable thead th[data-sort-key]').forEach((th) => {
     const key = th.getAttribute('data-sort-key');

@@ -24,5 +24,4 @@ export const nicMaxFilter = document.getElementById("nicMaxFilter");
 export const congestionMaxFilter = document.getElementById("congestionMaxFilter");
 export const bestServerBtn = document.getElementById("bestServerBtn");
 export const resetFiltersBtn = document.getElementById("resetFiltersBtn");
-export const pingAllBtn = document.getElementById("pingAllBtn");
 export const langSelect = document.getElementById("langSelect");

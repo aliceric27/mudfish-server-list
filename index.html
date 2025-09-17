@@ -57,7 +57,6 @@
           </label>
           <button id="bestServerBtn" class="action-button" type="button">最佳伺服器</button>
           <button id="resetFiltersBtn" class="action-button" type="button">重置篩選</button>
-          <button id="pingAllBtn" class="action-button" type="button" hidden>檢測所有伺服器延遲</button>
         </div>
       </div>
     </section>
@@ -75,7 +74,6 @@
             <th scope="col" data-sort-key="nicError">網卡錯誤數</th>
             <th scope="col" data-sort-key="network">流量 (MB)</th>
             <th scope="col" data-sort-key="congestion">擁擠度</th>
-            <th scope="col" data-sort-key="ping">延遲 (ms)</th>
           </tr>
         </thead>
         <tbody id="tableBody">
@@ -109,7 +107,6 @@
     </article>
   </template>
 
-  <script src="https://cdn.jsdelivr.net/gh/alfg/ping.js@0.3.0/dist/ping.min.js"></script>
   <script src="js/app.js" type="module"></script>
 </body>
 </html>
