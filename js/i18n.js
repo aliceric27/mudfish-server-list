@@ -4,7 +4,8 @@
 
 import { locationFilter, searchInput, langSelect, bestServerBtn, resetFiltersBtn } from './config.js';
 
-export let currentLang = 'zh'; // zh | en | ja | ko
+// 預設英語，若無使用者偏好且 IP 偵測失敗時使用
+export let currentLang = 'en'; // zh | en | ja | ko
 
 export const I18N = {
   zh: {
@@ -24,6 +25,14 @@ export const I18N = {
     errors: { loadFailed: '無法取得伺服器資料，請稍後再試。' },
     metricLabels: { systemLoad: '系統負載', network: '流量', congestion: '擁擠度' },
     metricImageLabels: { systemLoad: '系統負載圖表', network: '流量趨勢圖', congestion: '擁擠度趨勢圖' },
+    usage: {
+      heading: '使用方式',
+      items: [
+        '將滑鼠移至任一列，可即時抓取詳細伺服器狀態並顯示。',
+        '表格會在節點進入視窗時自動下載詳細資料並更新系統負載、流量與擁擠度欄位。',
+        '下拉選單可依不同地區查看節點，搜尋欄支援主機名與 IP，國家前綴可多選。',
+      ],
+    },
     hover: {
       labels: {
         ipv4: 'IPv4',
@@ -66,6 +75,14 @@ export const I18N = {
     errors: { loadFailed: 'Failed to fetch data. Please try again later.' },
     metricLabels: { systemLoad: 'System Load', network: 'Traffic', congestion: 'Congestion' },
     metricImageLabels: { systemLoad: 'System Load Chart', network: 'Traffic Trend', congestion: 'Congestion Trend' },
+    usage: {
+      heading: 'How to Use',
+      items: [
+        'Hover over any row to fetch and display detailed server status instantly.',
+        'As rows enter the viewport, the table auto-fetches details and updates load, traffic and congestion columns.',
+        'Use filters to narrow by provider and country prefix; the search supports hostname and IP; multiple country prefixes are supported.',
+      ],
+    },
     hover: {
       labels: {
         ipv4: 'IPv4',
@@ -108,6 +125,14 @@ export const I18N = {
     errors: { loadFailed: 'データの取得に失敗しました。しばらくしてからお試しください。' },
     metricLabels: { systemLoad: 'システム負荷', network: 'トラフィック', congestion: '混雑度' },
     metricImageLabels: { systemLoad: 'システム負荷グラフ', network: 'トラフィック推移', congestion: '混雑度推移' },
+    usage: {
+      heading: '使い方',
+      items: [
+        '任意の行にマウスオーバーすると、サーバー詳細が即時に取得・表示されます。',
+        '行がビューポートに入ると、自動的に詳細を取得し、負荷・トラフィック・混雑度の列を更新します。',
+        'プロバイダーや国コードで絞り込み、検索はホスト名と IP をサポート。国コードは複数選択可能です。',
+      ],
+    },
     hover: {
       labels: {
         ipv4: 'IPv4',
@@ -150,6 +175,14 @@ export const I18N = {
     errors: { loadFailed: '데이터를 가져오지 못했습니다. 잠시 후 다시 시도하세요.' },
     metricLabels: { systemLoad: '시스템 부하', network: '트래픽', congestion: '혼잡도' },
     metricImageLabels: { systemLoad: '시스템 부하 차트', network: '트래픽 추이', congestion: '혼잡도 추이' },
+    usage: {
+      heading: '사용 방법',
+      items: [
+        '임의의 행에 마우스를 올리면 서버 상세 정보가 즉시 표시됩니다.',
+        '행이 화면에 들어오면 자동으로 상세 정보를 가져와 부하/트래픽/혼잡도 열을 갱신합니다.',
+        '제공업체와 국가 접두어로 필터링하고, 검색은 호스트명과 IP 를 지원합니다. 국가 접두어는 다중 선택이 가능합니다.',
+      ],
+    },
     hover: {
       labels: {
         ipv4: 'IPv4',
@@ -263,4 +296,15 @@ export function applyI18nStatic() {
     const key = th.getAttribute('data-sort-key');
     if (headerMap[key]) th.textContent = headerMap[key];
   });
+
+  // Usage section (page footer)
+  const usageHeading = document.querySelector('.page__footer h2');
+  if (usageHeading) usageHeading.textContent = t('usage.heading');
+  const usageList = document.querySelectorAll('.page__footer ul li');
+  const items = (I18N[currentLang]?.usage?.items) || I18N.zh.usage.items;
+  if (usageList && usageList.length) {
+    usageList.forEach((li, idx) => {
+      if (items[idx]) li.textContent = items[idx];
+    });
+  }
 }

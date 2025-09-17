@@ -324,16 +324,46 @@ function updateHoverCardContent({ title, subtitle, details, footer }) {
 }
 
 function appendDetailValue(container, value, label) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'hover-card__detail';
-  const labelEl = document.createElement('span');
-  labelEl.className = 'hover-card__detail-label';
-  labelEl.textContent = label ?? '';
-  const valueEl = document.createElement('span');
-  valueEl.className = 'hover-card__detail-value';
-  valueEl.textContent = value ?? '—';
-  wrapper.appendChild(labelEl);
-  wrapper.appendChild(valueEl);
-  container.appendChild(wrapper);
+  // 使用 <dt>/<dd> 對來符合樣式（.hover-card__details 的 grid 設定與 dd img 限寬）
+  const dt = document.createElement('dt');
+  dt.textContent = label ?? '';
+
+  const dd = document.createElement('dd');
+
+  // 允許 value 是物件（{ type: 'image', src, alt, caption? }）或陣列/字串
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if (value.type === 'image' && value.src) {
+      const img = document.createElement('img');
+      img.src = value.src;
+      img.alt = value.alt || '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      dd.textContent = '';
+      dd.appendChild(img);
+      if (value.caption) {
+        const cap = document.createElement('div');
+        cap.className = 'hover-card__image-caption';
+        cap.textContent = String(value.caption);
+        dd.appendChild(cap);
+      }
+    } else {
+      dd.textContent = formatDetailText(value);
+    }
+  } else if (Array.isArray(value)) {
+    dd.textContent = formatDetailText(value.join('\n'));
+  } else {
+    dd.textContent = formatDetailText(value);
+  }
+
+  container.appendChild(dt);
+  container.appendChild(dd);
 }
 
+function formatDetailText(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'string') {
+    const s = v.trim();
+    return s || '—';
+  }
+  return String(v);
+}
