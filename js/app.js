@@ -22,6 +22,7 @@ import { t, setLanguage, applyI18nStatic, METRIC_IMAGE_LABELS, currentLang } fro
 import { loadServerCache, saveServerCache, loadUserFilters, saveUserFilters, applyUserFiltersFromStorage } from './storage.js';
 
 import { fetchStaticNodes, fetchGlobalMetrics, getServerDetail as getServerDetailRaw } from './api.js';
+import { pingHost } from './ping.js';
 import * as Table from './table.js';
 import * as Filters from './filters.js';
 import * as UI from './ui.js';
@@ -33,6 +34,8 @@ const detailCache = new Map();
 const pendingDetailRequests = new Map();
 const globalMetrics = new Map();
 const selectedCountryCodes = new Set();
+const pingResults = new Map();
+const pingInFlight = new Map();
 
 let sortState = { key: "region", direction: "asc" };
 function buildFiltersSnapshot() {
@@ -77,6 +80,7 @@ const SORTERS = {
   nicError: (node) => getGlobalMetricSortValue(node.sid, "nicError"),
   network: (node) => getGlobalMetricSortValue(node.sid, "network"),
   congestion: (node) => getGlobalMetricSortValue(node.sid, "congestion"),
+  ping: (node) => getPingSortValue(node.sid),
 };
 
 
@@ -105,8 +109,11 @@ async function bootstrap() {
     getDisplaySortExtractor: (key) => SORTERS[key] ?? SORTERS.region,
     getFilteredNodes: Filters.getFilteredNodes,
     getServerDetailCached,
+    getPingMs: (sid) => pingResults.get(String(sid)) ?? null,
     onSortChanged: () => {
-      Table.renderTable(Filters.getFilteredNodes());
+      const list = Filters.getFilteredNodes();
+      Table.renderTable(list);
+      updatePingAllVisibility(list.length);
       saveUserFilters(buildFiltersSnapshot());
     },
   });
@@ -129,6 +136,7 @@ async function bootstrap() {
     setSortState: (s) => { sortState = s; },
     updateSortIndicators: (headers) => Table.updateSortIndicators(headers),
     getHeaderEls: () => document.querySelectorAll("#serverTable thead th[data-sort-key]"),
+    onFilteredChange: (list) => updatePingAllVisibility(list?.length ?? 0),
   });
   UI.initUI({
     tableBody,
@@ -145,18 +153,23 @@ async function bootstrap() {
     congestionMaxFilter,
     bestServerBtn,
     resetFiltersBtn,
+    pingAllBtn,
     selectedCountryCodes,
     nodeLookup,
     t,
     setLanguage,
     onAfterLanguageChange: () => {
       UI.updateCountryToggleLabel();
-      Table.renderTable(Filters.getFilteredNodes());
+      const list = Filters.getFilteredNodes();
+      Table.renderTable(list);
+      updatePingAllVisibility(list.length);
       saveUserFilters(buildFiltersSnapshot());
     },
     onFiltersChange: () => Filters.applyFilters(),
     onResetFilters: () => Filters.resetFilters(),
     onTableRowClick,
+    onPingOne: (sid) => measurePingForSid(sid),
+    onPingAll: () => measurePingForList(Filters.getFilteredNodes()),
     renderTable: Table.renderTable,
     getServerDetailCached,
     buildDetailRows,
@@ -194,9 +207,12 @@ async function bootstrap() {
           setSortState: (s) => { sortState = s; }
         });
         Table.updateSortIndicators(document.querySelectorAll("#serverTable thead th[data-sort-key]"));
-        Table.renderTable(Filters.getFilteredNodes());
+        const list = Filters.getFilteredNodes();
+        Table.renderTable(list);
+        updatePingAllVisibility(list.length);
       } else {
         Table.renderTable(nodes);
+        updatePingAllVisibility(nodes.length);
       }
 
       // 背景刷新最新資料
@@ -259,6 +275,7 @@ async function initialize() {
     UI.populateLocationFilter(nodes);
     UI.populateCountryFilter(nodes);
     Table.renderTable(nodes);
+    updatePingAllVisibility(nodes.length);
     UI.attachEventListeners();
     Table.setupSorting();
     // 套用使用者設定（首次線上載入情境）
@@ -292,6 +309,66 @@ function mergeGlobalMetrics(metricsMap) {
   metricsMap.forEach((value, key) => {
     globalMetrics.set(String(key), value);
   });
+}
+
+function getPingSortValue(sid) {
+  const v = pingResults.get(String(sid));
+  return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
+}
+
+function updatePingAllVisibility(count) {
+  if (!pingAllBtn) return;
+  const show = Number.isFinite(count) && count > 0 && count <= 50;
+  pingAllBtn.hidden = !show;
+  if (show) {
+    pingAllBtn.textContent = t('buttons.pingAll') || 'Test Latency For All';
+  }
+}
+
+async function measurePingForSid(sid) {
+  sid = String(sid);
+  if (pingInFlight.has(sid)) return pingInFlight.get(sid);
+  const node = nodeLookup.get(sid);
+  if (!node) return;
+  const btn = tableBody.querySelector(`tr[data-sid="${sid}"] .ping-test-btn`);
+  const valEl = tableBody.querySelector(`tr[data-sid="${sid}"] .ping-value`);
+  if (btn) btn.disabled = true;
+  if (valEl) valEl.textContent = t('ping.testing');
+  const promise = measurePingByFetch(node.ip).then((ms) => {
+    if (typeof ms === 'number') pingResults.set(sid, ms);
+    updatePingCell(sid);
+    return ms;
+  }).catch(() => {
+    if (valEl) valEl.textContent = t('ping.timeout');
+  }).finally(() => { if (btn) btn.disabled = false; pingInFlight.delete(sid); });
+  pingInFlight.set(sid, promise);
+  return promise;
+}
+
+async function measurePingForList(list) {
+  const nodesToPing = (list || []).slice(0, 200);
+  const concurrency = 6;
+  let i = 0;
+  async function worker() {
+    while (i < nodesToPing.length) {
+      const idx = i++;
+      await measurePingForSid(nodesToPing[idx].sid);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, nodesToPing.length) }, worker));
+}
+
+function updatePingCell(sid) {
+  const row = tableBody.querySelector(`tr[data-sid="${sid}"]`);
+  if (!row) return;
+  const v = pingResults.get(String(sid));
+  const valEl = row.querySelector('.ping-value');
+  if (valEl) valEl.textContent = Number.isFinite(v) ? `${Math.round(v)} ms` : t('ping.na');
+}
+
+async function measurePingByFetch(ip, { timeoutMs = 3000 } = {}) {
+  // 改為使用 ping.js（Image 策略）。保留函式名稱以減少上層呼叫改動。
+  return pingHost(ip, { attempts: 3, timeoutMs });
 }
 
 // 依使用者 IP 自動推測語言（KR->ko, JP->ja, HK/TW/CN->zh, 其他->en）
@@ -362,6 +439,7 @@ function applyBestServerPreset() {
   const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
   Table.updateSortIndicators(headers);
   Table.renderTable(subset);
+  updatePingAllVisibility(subset.length);
   UI.hideHoverCard();
 }
 
@@ -612,12 +690,3 @@ function getGlobalMetricSortValue(sid, key) {
       return Number.MAX_SAFE_INTEGER;
   }
 }
-
-
-
-
-
-
-
-
-

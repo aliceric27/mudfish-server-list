@@ -16,6 +16,7 @@ let deps = {
   congestionMaxFilter: null,
   bestServerBtn: null,
   resetFiltersBtn: null,
+  pingAllBtn: null,
 
   // 狀態/資料
   selectedCountryCodes: null, // Set
@@ -28,6 +29,8 @@ let deps = {
   onFiltersChange: null,       // () => void
   onResetFilters: null,        // () => void
   onTableRowClick: null,       // (event) => void
+  onPingOne: null,             // (sid) => void
+  onPingAll: null,             // () => void
   renderTable: null,           // (list) => void
   getServerDetailCached: null, // (sid) => Promise
   buildDetailRows: null,       // (baseNode, detail) => rows
@@ -54,6 +57,10 @@ export function attachEventListeners() {
   deps.congestionMaxFilter?.addEventListener('input', () => deps.onFiltersChange?.());
   deps.bestServerBtn?.addEventListener('click', () => deps.onBestServerPreset?.());
   deps.resetFiltersBtn?.addEventListener('click', () => deps.onResetFilters?.());
+  // Ping All（顯示/隱藏由外層控制）
+  if (deps.pingAllBtn && deps.onPingAll) {
+    deps.pingAllBtn.addEventListener('click', () => deps.onPingAll?.());
+  }
 
   // 語言切換
   if (deps.langSelect) {
@@ -67,6 +74,26 @@ export function attachEventListeners() {
   // 表格列點擊：僅限 SID 欄位
   deps.tableBody?.addEventListener('click', (evt) => deps.onTableRowClick?.(evt));
 
+  // 單列 Ping 測試
+  deps.tableBody?.addEventListener('click', (evt) => {
+    const btn = evt.target.closest?.('.ping-test-btn');
+    if (!btn) return;
+    const row = btn.closest('tr[data-sid]');
+    const sid = row?.dataset?.sid;
+    if (sid) deps.onPingOne?.(sid);
+    evt.stopPropagation();
+  });
+
+  // 點擊已存在的延遲值可重測
+  deps.tableBody?.addEventListener('click', (evt) => {
+    const span = evt.target.closest?.('.ping-value.is-clickable');
+    if (!span) return;
+    const row = span.closest('tr[data-sid]');
+    const sid = row?.dataset?.sid;
+    if (sid) deps.onPingOne?.(sid);
+    evt.stopPropagation();
+  });
+
   // 國家面板切換
   deps.countryToggle?.addEventListener('click', () => toggleCountryPanel());
   deps.countryToggle?.addEventListener('keydown', (event) => {
@@ -76,8 +103,9 @@ export function attachEventListeners() {
     }
   });
 
-  // Hover Card 互動
+  // Hover Card 互動：在 Ping 欄避免彈出，以免擋到 Test 或點擊數值重測
   deps.tableBody?.addEventListener('pointerover', (event) => {
+    if (event.target.closest('.ping-cell') || event.target.closest('.ping-test-btn')) return;
     const row = event.target.closest('tr[data-sid]');
     if (!row) {
       if (activeRow) hideHoverCard();

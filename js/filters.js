@@ -94,6 +94,8 @@ export function applyFilters() {
   deps.hideHoverCard?.();
   const snap = deps.buildFiltersSnapshot?.();
   if (snap) deps.saveUserFilters?.(snap);
+  // 通知外層目前清單長度（讓 UI 決定是否顯示「檢測所有」按鈕）
+  deps.onFilteredChange?.(filtered);
 }
 
 export function resetFilters() {
@@ -121,4 +123,3 @@ export function resetFilters() {
   const snap = deps.buildFiltersSnapshot?.();
   if (snap) deps.saveUserFilters?.(snap);
 }
-

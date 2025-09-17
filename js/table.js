@@ -9,6 +9,7 @@ let deps = {
   getDisplaySortExtractor: (_key) => (n) => n,
   getFilteredNodes: () => [],
   getServerDetailCached: (_sid) => Promise.resolve(),
+  getPingMs: (_sid) => null,
 };
 
 let rowObserver = null;
@@ -71,6 +72,7 @@ export function createRow(node) {
     <td class="metric-cell" data-metric="nicError">${renderMetricValue(metrics?.nicErrorText, "nicError")}</td>
     <td class="metric-cell" data-metric="network">${renderMetricValue(metrics?.networkText, "network")}</td>
     <td class="metric-cell" data-metric="congestion">${renderMetricValue(metrics?.congestionText, "congestion")}</td>
+    <td class="ping-cell" data-metric="ping">${renderPingCell(node.sid)}</td>
   `;
 
   const regionSpan = row.querySelector('.region-cell .truncate-15ch');
@@ -81,6 +83,17 @@ export function createRow(node) {
 
   applyRowSortDataset(row, metrics);
   return row;
+}
+
+function renderPingCell(sid) {
+  const value = deps.getPingMs(String(sid));
+  const has = Number.isFinite(value);
+  const text = has ? `${Math.round(value)} ms` : '';
+  const btnLabel = deps.t('buttons.ping') || 'Test';
+  const spanCls = has ? 'ping-value is-clickable' : 'ping-value';
+  const spanStyle = has ? '' : 'display:none;';
+  const btnStyle = has ? 'display:none;' : '';
+  return `<span class="${spanCls}" style="${spanStyle}">${text}</span> <button type="button" class="action-button ping-test-btn" style="${btnStyle}">${btnLabel}</button>`;
 }
 
 export function updateRowContent(row, node) {
@@ -107,6 +120,7 @@ export function updateRowContent(row, node) {
   if (tds[6]) tds[6].innerHTML = renderMetricValue(metrics?.nicErrorText, "nicError");
   if (tds[7]) tds[7].innerHTML = renderMetricValue(metrics?.networkText, "network");
   if (tds[8]) tds[8].innerHTML = renderMetricValue(metrics?.congestionText, "congestion");
+  if (tds[9]) tds[9].innerHTML = renderPingCell(node.sid);
 
   applyRowSortDataset(row, metrics);
 }
@@ -114,7 +128,7 @@ export function updateRowContent(row, node) {
 export function setTablePlaceholder(message) {
   deps.tableBody.innerHTML = `
     <tr>
-      <td colspan="9" class="status-table__placeholder">${message}</td>
+      <td colspan="10" class="status-table__placeholder">${message}</td>
     </tr>
   `;
 }
@@ -252,4 +266,3 @@ export function sortNodes(list) {
     return a.hostname.localeCompare(b.hostname, "zh-Hant");
   });
 }
-
