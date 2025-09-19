@@ -2,9 +2,10 @@
 // 職責：集中管理環境常數、API endpoint、localStorage key 與常用 DOM 元素。
 
 // API endpoints
-export const STATIC_NODES_ENDPOINT = "https://mudfish.net/api/staticnodes";
-export const NODE_DETAIL_ENDPOINT = (sid) => `https://mudfish.net/admin/serverstatus/${sid}`;
-export const GLOBAL_STATUS_ENDPOINT = "https://mudfish.net/server/status";
+const API_BASE_URL = "https://mud-server-list.aliceric27.workers.dev";
+export const STATIC_NODES_ENDPOINT = `${API_BASE_URL}/staticnodes`;
+export const GLOBAL_STATUS_ENDPOINT = `${API_BASE_URL}/server-status`;
+export const NODE_DETAIL_ENDPOINT = (sid) => `${API_BASE_URL}/server-status/${sid}`;
 
 // localStorage keys
 export const LS_CACHE_KEY = "mudfish_server_cache";
@@ -16,8 +17,6 @@ export const locationFilter = document.getElementById("locationFilter");
 export const searchInput = document.getElementById("searchInput");
 export const countryFilterContainer = document.getElementById("countryFilter");
 export const countryToggle = document.getElementById("countryToggle");
-export const hoverCard = document.getElementById("hoverCard");
-export const hoverCardTemplate = document.getElementById("hoverCardTemplate");
 export const cpuMaxFilter = document.getElementById("cpuMaxFilter");
 export const ioMaxFilter = document.getElementById("ioMaxFilter");
 export const nicMaxFilter = document.getElementById("nicMaxFilter");

@@ -8,10 +8,7 @@ let deps = {
   setSortState: (_s) => {},
   getDisplaySortExtractor: (_key) => (n) => n,
   getFilteredNodes: () => [],
-  getServerDetailCached: (_sid) => Promise.resolve(),
 };
-
-let rowObserver = null;
 
 export function initTable(initDeps) {
   deps = { ...deps, ...initDeps };
@@ -140,22 +137,17 @@ export function sortForDisplay(list) {
 export function renderTable(data) {
   deps.tableBody.innerHTML = "";
   if (!data.length) {
-    clearRowObserver();
     setTablePlaceholder(deps.t('table.empty'));
     return;
   }
   const sorted = sortForDisplay(data);
-  clearRowObserver();
   const fragment = document.createDocumentFragment();
-  const rowsToObserve = [];
   sorted.forEach((node) => {
-    const row = createRow(node);
-    fragment.appendChild(row);
-    rowsToObserve.push(row);
+    fragment.appendChild(createRow(node));
   });
   deps.tableBody.appendChild(fragment);
-  rowsToObserve.forEach((row) => observeRow(row));
 }
+
 
 export function updateTableIncremental(desiredList) {
   const desiredIndex = new Map(desiredList.map((n, i) => [String(n.sid), i]));
@@ -172,13 +164,13 @@ export function updateTableIncremental(desiredList) {
     if (!row) {
       row = createRow(node);
       deps.tableBody.insertBefore(row, ref);
-      observeRow(row);
     } else {
-      if (row !== ref) deps.tableBody.insertBefore(row, ref);
+      if (row != ref) deps.tableBody.insertBefore(row, ref);
       updateRowContent(row, node);
     }
   });
 }
+
 
 // ---------- 初始排序設定 ----------
 export function setupSorting() {
@@ -206,39 +198,6 @@ export function updateSortIndicators(headers) {
     if (th.dataset.sortKey === cur.key) {
       th.classList.add(cur.direction === "asc" ? "is-asc" : "is-desc");
     }
-  });
-}
-
-// ---------- 觀察者 ----------
-export function ensureRowObserver() {
-  if (!rowObserver) {
-    rowObserver = new IntersectionObserver(handleRowIntersection, {
-      root: null,
-      threshold: 0.2,
-    });
-  }
-}
-
-export function observeRow(row) {
-  if (!row) return;
-  ensureRowObserver();
-  rowObserver.observe(row);
-}
-
-export function clearRowObserver() {
-  if (rowObserver) {
-    rowObserver.disconnect();
-  }
-}
-
-function handleRowIntersection(entries) {
-  entries.forEach((entry) => {
-    if (!entry.isIntersecting) return;
-    const row = entry.target;
-    const sid = row.dataset.sid;
-    if (!sid) return;
-    rowObserver.unobserve(row);
-    deps.getServerDetailCached(sid).catch(() => {});
   });
 }
 

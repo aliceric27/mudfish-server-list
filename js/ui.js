@@ -1,12 +1,10 @@
-// ui.js - UI 互動模組（事件、面板切換、Hover Card、過濾器 UI）
+// ui.js - UI 互動模組（事件、面板切換、過濾器 UI）
 
 let deps = {
   // DOM 元素
   tableBody: null,
   countryFilterContainer: null,
   countryToggle: null,
-  hoverCard: null,
-  hoverCardTemplate: null,
   langSelect: null,
   locationFilter: null,
   searchInput: null,
@@ -19,7 +17,6 @@ let deps = {
 
   // 狀態/資料
   selectedCountryCodes: null, // Set
-  nodeLookup: null,           // Map<sid, node>
 
   // 回呼/工具
   t: null,
@@ -29,15 +26,10 @@ let deps = {
   onResetFilters: null,        // () => void
   onTableRowClick: null,       // (event) => void
   renderTable: null,           // (list) => void
-  getServerDetailCached: null, // (sid) => Promise
-  buildDetailRows: null,       // (baseNode, detail) => rows
-  formatTime: null,            // (Date) => string
 };
 
 // 本模組的內部狀態
 let isCountryPanelOpen = false;
-let activeRow = null;
-let lastPointerPosition = null;
 const countryCheckboxes = new Map();
 
 export function initUI(initDeps) {
@@ -74,47 +66,13 @@ export function attachEventListeners() {
       toggleCountryPanel();
     }
   });
-
-  // Hover Card 互動：在 Ping 欄避免彈出，以免擋到 Test 或點擊數值重測
-  deps.tableBody?.addEventListener('pointerover', (event) => {
-    const row = event.target.closest('tr[data-sid]');
-    if (!row) {
-      if (activeRow) hideHoverCard();
-      return;
-    }
-    if (activeRow !== row) {
-      lastPointerPosition = { x: event.clientX, y: event.clientY };
-      showHoverForRow(row, lastPointerPosition);
-    }
-  });
-
-  deps.tableBody?.addEventListener('pointermove', (event) => {
-    if (!activeRow) return;
-    lastPointerPosition = { x: event.clientX, y: event.clientY };
-    positionHoverCard(lastPointerPosition);
-  });
-
-  deps.tableBody?.addEventListener('pointerout', (event) => {
-    const relatedRow = event.relatedTarget?.closest?.('tr[data-sid]');
-    if (!relatedRow) hideHoverCard();
-  });
-
-  deps.tableBody?.addEventListener('focusin', (event) => {
-    const row = event.target.closest('tr[data-sid]');
-    if (row) showHoverForRow(row, getRowViewportCenter(row));
-  });
-
-  deps.tableBody?.addEventListener('focusout', (event) => {
-    if (!deps.tableBody.contains(event.relatedTarget)) hideHoverCard();
-  });
-
-  window.addEventListener('scroll', () => {
-    if (activeRow) positionHoverCard(getRowViewportCenter(activeRow));
-  });
-  window.addEventListener('resize', () => {
-    if (activeRow) positionHoverCard(getRowViewportCenter(activeRow));
-  });
 }
+
+
+
+
+
+
 
 export function toggleCountryPanel(forceOpen) {
   const next = typeof forceOpen === 'boolean' ? forceOpen : !isCountryPanelOpen;
@@ -214,165 +172,9 @@ export function populateCountryFilter(nodeList) {
   deps.countryFilterContainer.appendChild(fragment);
 }
 
-export async function showHoverForRow(row, position) {
-  const sid = row?.dataset?.sid;
-  if (!sid) return;
-  activeRow = row;
 
-  const baseNode = deps.nodeLookup?.get?.(sid);
-  if (!baseNode) return;
 
-  if (deps.hoverCard) deps.hoverCard.hidden = false;
-  updateHoverCardContent({
-    title: baseNode.hostname,
-    subtitle: baseNode.location,
-    details: [
-      { label: deps.t?.('hover.labels.ipv4'), value: baseNode.ip },
-      { label: deps.t?.('hover.labels.sid'), value: String(baseNode.sid) },
-      { label: deps.t?.('hover.labels.status'), value: deps.t?.('hover.fetching') },
-    ],
-    footer: deps.t?.('hover.firstLoadHint'),
-    isLoading: true,
-  });
 
-  const anchor = position ?? lastPointerPosition ?? getRowViewportCenter(row);
-  positionHoverCard(anchor);
 
-  try {
-    const detail = await deps.getServerDetailCached?.(sid);
-    if (activeRow !== row) return;
-    const detailRows = deps.buildDetailRows?.(baseNode, detail) ?? [];
-    const footerText = detail?.fetchedAt
-      ? `${deps.t?.('hover.fetchTimePrefix')}${deps.formatTime?.(detail.fetchedAt)}`
-      : deps.t?.('hover.liveSource');
 
-    updateHoverCardContent({
-      title: baseNode.hostname,
-      subtitle: baseNode.location,
-      details: detailRows,
-      footer: footerText,
-      isLoading: false,
-    });
-    const updatedAnchor = lastPointerPosition ?? anchor ?? getRowViewportCenter(row);
-    positionHoverCard(updatedAnchor);
-  } catch (err) {
-    if (activeRow !== row) return;
-    updateHoverCardContent({
-      title: baseNode.hostname,
-      subtitle: baseNode.location,
-      details: [
-        { label: deps.t?.('hover.labels.ipv4'), value: baseNode.ip },
-        { label: deps.t?.('hover.labels.sid'), value: String(baseNode.sid) },
-        { label: deps.t?.('hover.labels.status'), value: deps.t?.('hover.fetchFailed') },
-      ],
-      footer: deps.t?.('hover.retryLater'),
-      isLoading: false,
-    });
-    const fallbackAnchor = lastPointerPosition ?? anchor ?? getRowViewportCenter(row);
-    positionHoverCard(fallbackAnchor);
-  }
-}
 
-export function hideHoverCard() {
-  activeRow = null;
-  if (deps.hoverCard) deps.hoverCard.hidden = true;
-}
-
-function positionHoverCard(position) {
-  if (!position || !deps.hoverCard) return;
-  const offset = 18;
-  const viewportPadding = 12;
-  const rect = deps.hoverCard.getBoundingClientRect();
-  let left = position.x + offset;
-  let top = position.y + offset;
-
-  const vw = document.documentElement.clientWidth;
-  const vh = document.documentElement.clientHeight;
-
-  if (left + rect.width + viewportPadding > vw) {
-    left = Math.max(viewportPadding, vw - rect.width - viewportPadding);
-  }
-  if (top + rect.height + viewportPadding > vh) {
-    top = Math.max(viewportPadding, vh - rect.height - viewportPadding);
-  }
-
-  deps.hoverCard.style.left = `${Math.round(left)}px`;
-  deps.hoverCard.style.top = `${Math.round(top)}px`;
-}
-
-function getRowViewportCenter(row) {
-  const rect = row.getBoundingClientRect();
-  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-}
-
-function updateHoverCardContent({ title, subtitle, details, footer, isLoading = false }) {
-  if (!deps.hoverCardTemplate || !deps.hoverCard) return;
-  const fragment = deps.hoverCardTemplate.content.cloneNode(true);
-  const titleEl = fragment.querySelector('.hover-card__title');
-  const subtitleEl = fragment.querySelector('.hover-card__subtitle');
-  const detailsEl = fragment.querySelector('.hover-card__details');
-  const footerEl = fragment.querySelector('.hover-card__footer');
-  const spinnerEl = fragment.querySelector('.hover-card__spinner');
-
-  if (titleEl) titleEl.textContent = title ?? '';
-  if (subtitleEl) subtitleEl.textContent = subtitle ?? '';
-
-  detailsEl.innerHTML = '';
-  (details ?? []).forEach((row) => appendDetailValue(detailsEl, row.value, row.label));
-
-  footerEl.textContent = footer ?? '';
-
-  if (spinnerEl) {
-    spinnerEl.hidden = !isLoading;
-    spinnerEl.setAttribute('aria-hidden', 'true');
-  }
-
-  deps.hoverCard.innerHTML = '';
-  deps.hoverCard.appendChild(fragment);
-  deps.hoverCard.classList.toggle('hover-card--loading', Boolean(isLoading));
-}
-
-function appendDetailValue(container, value, label) {
-  // 使用 <dt>/<dd> 對來符合樣式（.hover-card__details 的 grid 設定與 dd img 限寬）
-  const dt = document.createElement('dt');
-  dt.textContent = label ?? '';
-
-  const dd = document.createElement('dd');
-
-  // 允許 value 是物件（{ type: 'image', src, alt, caption? }）或陣列/字串
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    if (value.type === 'image' && value.src) {
-      const img = document.createElement('img');
-      img.src = value.src;
-      img.alt = value.alt || '';
-      img.loading = 'lazy';
-      img.decoding = 'async';
-      dd.textContent = '';
-      dd.appendChild(img);
-      if (value.caption) {
-        const cap = document.createElement('div');
-        cap.className = 'hover-card__image-caption';
-        cap.textContent = String(value.caption);
-        dd.appendChild(cap);
-      }
-    } else {
-      dd.textContent = formatDetailText(value);
-    }
-  } else if (Array.isArray(value)) {
-    dd.textContent = formatDetailText(value.join('\n'));
-  } else {
-    dd.textContent = formatDetailText(value);
-  }
-
-  container.appendChild(dt);
-  container.appendChild(dd);
-}
-
-function formatDetailText(v) {
-  if (v === null || v === undefined) return '—';
-  if (typeof v === 'string') {
-    const s = v.trim();
-    return s || '—';
-  }
-  return String(v);
-}

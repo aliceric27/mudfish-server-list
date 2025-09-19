@@ -16,7 +16,6 @@ let deps = {
   // 其他依賴
   getNodes: null,                 // () => nodes array（可選）
   renderTable: null,              // (list) => void
-  hideHoverCard: null,            // () => void
   saveUserFilters: null,          // (snapshot) => void
   buildFiltersSnapshot: null,     // () => object
   refreshCountryFilterUI: null,   // () => void
@@ -91,7 +90,6 @@ export function getFilteredNodes(list) {
 export function applyFilters() {
   const filtered = getFilteredNodes();
   deps.renderTable?.(filtered);
-  deps.hideHoverCard?.();
   const snap = deps.buildFiltersSnapshot?.();
   if (snap) deps.saveUserFilters?.(snap);
 }
@@ -117,7 +115,6 @@ export function resetFilters() {
 
   // 重新渲染並儲存
   deps.renderTable?.(getFilteredNodes());
-  deps.hideHoverCard?.();
   const snap = deps.buildFiltersSnapshot?.();
   if (snap) deps.saveUserFilters?.(snap);
 }

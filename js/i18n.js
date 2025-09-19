@@ -14,7 +14,13 @@ export const I18N = {
     langLabel: '語言',
     provider: { filterLabel: '供應商篩選', all: '全部供應商' },
     search: { label: '關鍵字搜尋', placeholder: '主機名或 IP', aria: '輸入主機名或 IP 搜尋' },
-    country: { all: '國家前綴（全部）', selected: (n) => `國家前綴（已選 ${n}）` },
+    country: {
+      all: '國家前綴（全部）',
+      selected: (value) => {
+        const count = typeof value === 'number' ? value : value?.count ?? 0;
+        return `國家前綴（已選 ${count}）`;
+      },
+    },
     load: { section: '系統負載篩選', aria: '系統負載數值篩選', cpu: 'CPU', io: 'IO', nic: '錯誤', congestion: '擁擠', any: '任意' },
     buttons: { best: '最佳伺服器', reset: '重置篩選' },
     table: {
@@ -57,6 +63,40 @@ export const I18N = {
       noDetails: '暫無詳細資料',
       chartAlt: '圖表',
     },
+    map: {
+      title: 'Mudfish 全球節點地圖',
+      subtitle: '以 OpenStreetMap 與 Leaflet 即時檢視 Mudfish 伺服器位置與健康狀態。',
+      back: '← 返回表格儀表板',
+      sidebarTitle: '節點清單',
+      sidebarHint: '點擊地圖上的國家節點以檢視城市與伺服器明細',
+      placeholder: '請點擊地圖上的國家節點以檢視其伺服器列表。',
+      selection: {
+        none: '尚未選取國家',
+        count: (value) => {
+          const count = typeof value === 'number' ? value : value?.count ?? 0;
+          return `${count} 台伺服器`;
+        },
+      },
+      popupCount: (value) => {
+        const count = typeof value === 'number' ? value : value?.count ?? 0;
+        return `${count} 台伺服器`;
+      },
+      pagination: {
+        summary: ({ page, totalPages, start, end, total }) => `第 ${page} / ${totalPages} 頁 · 顯示 ${start}-${end} / ${total} 台`,
+        prev: '上一頁',
+        next: '下一頁',
+      },
+      statuses: {
+        normal: '運作正常',
+        congested: '伺服器壅擠',
+        error: '伺服器錯誤',
+        unknown: '狀態未知',
+      },
+      congestionLabel: '擁擠度：',
+      markerTitle: ({ country, status, count }) => `${country}：${status}（${count} 台）`,
+      serverTitle: ({ location, sid }) => `${location}（SID ${sid}）`,
+      paginationAria: '節點分頁導航',
+    },
   },
   en: {
     title: 'Mudfish Server Status Dashboard',
@@ -64,7 +104,13 @@ export const I18N = {
     langLabel: 'Language',
     provider: { filterLabel: 'Provider Filter', all: 'All Providers' },
     search: { label: 'Search', placeholder: 'Hostname or IP', aria: 'Type hostname or IP to search' },
-    country: { all: 'Country Prefix (All)', selected: (n) => `Country Prefix (Selected ${n})` },
+    country: {
+      all: 'Country Prefix (All)',
+      selected: (value) => {
+        const count = typeof value === 'number' ? value : value?.count ?? 0;
+        return `Country Prefix (Selected ${count})`;
+      },
+    },
     load: { section: 'System Load Filters', aria: 'System load value filters', cpu: 'CPU', io: 'IO', nic: 'Errors', congestion: 'Congestion', any: 'Any' },
     buttons: { best: 'Best Server', reset: 'Reset Filters' },
     table: {
@@ -107,6 +153,40 @@ export const I18N = {
       noDetails: 'No details available',
       chartAlt: 'Chart',
     },
+    map: {
+      title: 'Mudfish Global Node Map',
+      subtitle: 'Inspect Mudfish server locations and health in real time with OpenStreetMap and Leaflet.',
+      back: '← Back to Dashboard',
+      sidebarTitle: 'Node List',
+      sidebarHint: 'Select a country marker on the map to view city and server details.',
+      placeholder: 'Click a country marker to view its server list.',
+      selection: {
+        none: 'No country selected',
+        count: (value) => {
+          const count = typeof value === 'number' ? value : value?.count ?? 0;
+          return `${count} servers`;
+        },
+      },
+      popupCount: (value) => {
+        const count = typeof value === 'number' ? value : value?.count ?? 0;
+        return `${count} servers`;
+      },
+      pagination: {
+        summary: ({ page, totalPages, start, end, total }) => `Page ${page} / ${totalPages} · Showing ${start}-${end} of ${total}`,
+        prev: 'Previous',
+        next: 'Next',
+      },
+      statuses: {
+        normal: 'Online',
+        congested: 'Congested',
+        error: 'Server Error',
+        unknown: 'Unknown',
+      },
+      congestionLabel: 'Congestion: ',
+      markerTitle: ({ country, status, count }) => `${country}: ${status} (${count} servers)`,
+      serverTitle: ({ location, sid }) => `${location} (SID ${sid})`,
+      paginationAria: 'Node list pagination',
+    },
   },
   ja: {
     title: 'Mudfish サーバーステータス ダッシュボード',
@@ -114,7 +194,13 @@ export const I18N = {
     langLabel: '言語',
     provider: { filterLabel: 'プロバイダー', all: 'すべてのプロバイダー' },
     search: { label: '検索', placeholder: 'ホスト名 または IP', aria: 'ホスト名または IP を入力' },
-    country: { all: '国コード（すべて）', selected: (n) => `国コード（${n} 件選択）` },
+    country: {
+      all: '国コード（すべて）',
+      selected: (value) => {
+        const count = typeof value === 'number' ? value : value?.count ?? 0;
+        return `国コード（${count} 件選択）`;
+      },
+    },
     load: { section: 'システム負荷フィルター', aria: 'システム負荷の数値フィルター', cpu: 'CPU', io: 'IO', nic: 'エラー', congestion: '混雑度', any: '指定なし' },
     buttons: { best: '最適サーバー', reset: 'フィルターをリセット' },
     table: {
@@ -157,6 +243,40 @@ export const I18N = {
       noDetails: '詳細はありません',
       chartAlt: 'チャート',
     },
+    map: {
+      title: 'Mudfish グローバルノードマップ',
+      subtitle: 'OpenStreetMap と Leaflet で Mudfish サーバーの位置と状態をリアルタイムに確認。',
+      back: '← ダッシュボードへ戻る',
+      sidebarTitle: 'ノード一覧',
+      sidebarHint: '地図上の国マーカーをクリックすると都市とサーバー詳細を表示します',
+      placeholder: '国マーカーをクリックしてサーバー一覧を表示してください。',
+      selection: {
+        none: '国が選択されていません',
+        count: (value) => {
+          const count = typeof value === 'number' ? value : value?.count ?? 0;
+          return `${count} 台のサーバー`;
+        },
+      },
+      popupCount: (value) => {
+        const count = typeof value === 'number' ? value : value?.count ?? 0;
+        return `${count} 台のサーバー`;
+      },
+      pagination: {
+        summary: ({ page, totalPages, start, end, total }) => `ページ ${page} / ${totalPages} · ${start}-${end} / ${total} 件を表示`,
+        prev: '前へ',
+        next: '次へ',
+      },
+      statuses: {
+        normal: '正常',
+        congested: '混雑',
+        error: 'サーバーエラー',
+        unknown: '不明',
+      },
+      congestionLabel: '混雑度：',
+      markerTitle: ({ country, status, count }) => `${country}：${status}（${count} 台）`,
+      serverTitle: ({ location, sid }) => `${location}（SID ${sid}）`,
+      paginationAria: 'ノード一覧のページ切り替え',
+    },
   },
   ko: {
     title: 'Mudfish 서버 상태 대시보드',
@@ -164,7 +284,13 @@ export const I18N = {
     langLabel: '언어',
     provider: { filterLabel: '제공업체 필터', all: '모든 제공업체' },
     search: { label: '검색', placeholder: '호스트명 또는 IP', aria: '호스트명 또는 IP 입력' },
-    country: { all: '국가 접두어(전체)', selected: (n) => `국가 접두어(${n}개 선택)` },
+    country: {
+      all: '국가 접두어(전체)',
+      selected: (value) => {
+        const count = typeof value === 'number' ? value : value?.count ?? 0;
+        return `국가 접두어(${count}개 선택)`;
+      },
+    },
     load: { section: '시스템 부하 필터', aria: '시스템 부하 값 필터', cpu: 'CPU', io: 'IO', nic: '오류', congestion: '혼잡도', any: '제한 없음' },
     buttons: { best: '최적 서버', reset: '필터 초기화' },
     table: {
@@ -207,6 +333,40 @@ export const I18N = {
       noDetails: '표시할 상세 정보 없음',
       chartAlt: '차트',
     },
+    map: {
+      title: 'Mudfish 글로벌 노드 지도',
+      subtitle: 'OpenStreetMap과 Leaflet으로 Mudfish 서버 위치와 상태를 실시간 확인하세요.',
+      back: '← 대시보드로 돌아가기',
+      sidebarTitle: '노드 목록',
+      sidebarHint: '지도에서 국가 마커를 선택하면 도시와 서버 상세 정보를 볼 수 있습니다.',
+      placeholder: '국가 마커를 클릭하여 해당 서버 목록을 확인하세요.',
+      selection: {
+        none: '선택된 국가가 없습니다',
+        count: (value) => {
+          const count = typeof value === 'number' ? value : value?.count ?? 0;
+          return `${count}대 서버`;
+        },
+      },
+      popupCount: (value) => {
+        const count = typeof value === 'number' ? value : value?.count ?? 0;
+        return `${count}대 서버`;
+      },
+      pagination: {
+        summary: ({ page, totalPages, start, end, total }) => `페이지 ${page} / ${totalPages} · ${start}-${end} / ${total}대 서버 표시`,
+        prev: '이전',
+        next: '다음',
+      },
+      statuses: {
+        normal: '정상',
+        congested: '혼잡',
+        error: '서버 오류',
+        unknown: '상태 미확인',
+      },
+      congestionLabel: '혼잡도: ',
+      markerTitle: ({ country, status, count }) => `${country}: ${status} (${count}대)`,
+      serverTitle: ({ location, sid }) => `${location} (SID ${sid})`,
+      paginationAria: '노드 목록 페이지 탐색',
+    },
   },
 };
 
@@ -214,10 +374,21 @@ export function t(path, vars) {
   const segs = path.split('.');
   let cur = I18N[currentLang] || I18N.zh;
   for (const s of segs) cur = cur?.[s];
-  if (typeof cur === 'function') return cur(vars?.count ?? vars ?? 0);
+  if (typeof cur === 'function') {
+    if (vars != null && typeof vars === 'object' && !Array.isArray(vars)) {
+      return cur(vars);
+    }
+    return cur(vars ?? 0);
+  }
   if (cur == null) {
     cur = I18N.zh;
     for (const s of segs) cur = cur?.[s];
+    if (typeof cur === 'function') {
+      if (vars != null && typeof vars === 'object' && !Array.isArray(vars)) {
+        return cur(vars);
+      }
+      return cur(vars ?? 0);
+    }
   }
   return cur ?? path;
 }
@@ -236,51 +407,55 @@ export function setLanguage(lang) {
 }
 
 export function applyI18nStatic() {
-  // Title/subtitle
-  const titleEl = document.querySelector('.page__title');
-  if (titleEl) titleEl.textContent = t('title');
-  const subEl = document.querySelector('.page__subtitle');
-  if (subEl) subEl.textContent = t('subtitle');
+  updateSharedLanguageControls();
+  applyDashboardStatic();
+  applyMapStatic();
+}
 
-  // Provider filter
-  const provLabel = document.querySelector('label[for="locationFilter"]');
-  if (provLabel) provLabel.textContent = t('provider.filterLabel');
-  const allOpt = locationFilter?.querySelector('option[value="all"]');
-  if (allOpt) allOpt.textContent = t('provider.all');
-
-  // Language selector label + aria
+function updateSharedLanguageControls() {
   const langLabelEl = document.querySelector('label[for="langSelect"]');
   if (langLabelEl) langLabelEl.textContent = t('langLabel');
   if (langSelect) langSelect.setAttribute('aria-label', t('langLabel'));
+}
 
-  // Search
-  const searchLabel = document.querySelector('label[for="searchInput"]');
+function applyDashboardStatic() {
+  const root = document.querySelector('main.page:not(.page--map)');
+  if (!root) return;
+
+  const titleEl = root.querySelector('.page__title');
+  if (titleEl) titleEl.textContent = t('title');
+  const subEl = root.querySelector('.page__subtitle');
+  if (subEl) subEl.textContent = t('subtitle');
+
+  const provLabel = root.querySelector('label[for="locationFilter"]');
+  if (provLabel) provLabel.textContent = t('provider.filterLabel');
+  const allOpt = locationFilter?.querySelector?.('option[value="all"]');
+  if (allOpt) allOpt.textContent = t('provider.all');
+
+  const searchLabel = root.querySelector('label[for="searchInput"]');
   if (searchLabel) searchLabel.textContent = t('search.label');
   if (searchInput) {
     searchInput.placeholder = t('search.placeholder');
     searchInput.setAttribute('aria-label', t('search.aria'));
   }
 
-  // Load section + labels
-  const loadLabel = document.querySelector('.controls__group--load .controls__label');
+  const loadLabel = root.querySelector('.controls__group--load .controls__label');
   if (loadLabel) loadLabel.textContent = t('load.section');
-  const cpuL = document.querySelector('label[for="cpuMaxFilter"]');
+  const cpuL = root.querySelector('label[for="cpuMaxFilter"]');
   if (cpuL) cpuL.childNodes[0].textContent = `${t('load.cpu')} ≤\n            `;
-  const ioL = document.querySelector('label[for="ioMaxFilter"]');
+  const ioL = root.querySelector('label[for="ioMaxFilter"]');
   if (ioL) ioL.childNodes[0].textContent = `${t('load.io')} ≤\n            `;
-  const nicL = document.querySelector('label[for="nicMaxFilter"]');
+  const nicL = root.querySelector('label[for="nicMaxFilter"]');
   if (nicL) nicL.childNodes[0].textContent = `${t('load.nic')} ≤\n            `;
-  const congL = document.querySelector('label[for="congestionMaxFilter"]');
+  const congL = root.querySelector('label[for="congestionMaxFilter"]');
   if (congL) congL.childNodes[0].textContent = `${t('load.congestion')} ≤\n            `;
-  document.querySelectorAll('.load-filter__input').forEach((inp) => inp.setAttribute('placeholder', t('load.any')));
-  const loadGroup = document.querySelector('.load-filter');
+  root.querySelectorAll('.load-filter__input').forEach((inp) => inp.setAttribute('placeholder', t('load.any')));
+  const loadGroup = root.querySelector('.load-filter');
   if (loadGroup) loadGroup.setAttribute('aria-label', t('load.aria'));
 
-  // Buttons
   if (bestServerBtn) bestServerBtn.textContent = t('buttons.best');
   if (resetFiltersBtn) resetFiltersBtn.textContent = t('buttons.reset');
 
-  // Table headers
   const headerMap = {
     region: t('table.headers.region'),
     provider: t('table.headers.provider'),
@@ -292,19 +467,44 @@ export function applyI18nStatic() {
     network: t('table.headers.network'),
     congestion: t('table.headers.congestion'),
   };
-  document.querySelectorAll('#serverTable thead th[data-sort-key]').forEach((th) => {
+  root.querySelectorAll('#serverTable thead th[data-sort-key]').forEach((th) => {
     const key = th.getAttribute('data-sort-key');
-    if (headerMap[key]) th.textContent = headerMap[key];
+    if (key && headerMap[key]) th.textContent = headerMap[key];
   });
 
-  // Usage section (page footer)
-  const usageHeading = document.querySelector('.page__footer h2');
+  const usageHeading = root.querySelector('.page__footer h2');
   if (usageHeading) usageHeading.textContent = t('usage.heading');
-  const usageList = document.querySelectorAll('.page__footer ul li');
+  const usageList = root.querySelectorAll('.page__footer ul li');
   const items = (I18N[currentLang]?.usage?.items) || I18N.zh.usage.items;
   if (usageList && usageList.length) {
     usageList.forEach((li, idx) => {
       if (items[idx]) li.textContent = items[idx];
     });
   }
+}
+
+function applyMapStatic() {
+  const root = document.querySelector('main.page--map');
+  if (!root) return;
+
+  const titleEl = root.querySelector('.page__title');
+  if (titleEl) titleEl.textContent = t('map.title');
+  const subEl = root.querySelector('.page__subtitle');
+  if (subEl) subEl.textContent = t('map.subtitle');
+  const backLink = root.querySelector('.page__link-back');
+  if (backLink) backLink.textContent = t('map.back');
+
+  const sidebarTitle = root.querySelector('.map-sidebar__title');
+  if (sidebarTitle) sidebarTitle.textContent = t('map.sidebarTitle');
+  const sidebarHint = root.querySelector('#mapSidebarHint');
+  if (sidebarHint) sidebarHint.textContent = t('map.sidebarHint');
+
+  const selectionLabel = root.querySelector('[data-selection-label]');
+  if (selectionLabel) selectionLabel.textContent = t('map.selection.none');
+  const selectionCount = root.querySelector('[data-selection-count]');
+  if (selectionCount) selectionCount.textContent = '—';
+
+  root.querySelectorAll('.map-city-list__pagination').forEach((nav) => {
+    nav.setAttribute('aria-label', t('map.paginationAria'));
+  });
 }

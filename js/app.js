@@ -6,8 +6,6 @@ import {
   searchInput,
   countryFilterContainer,
   countryToggle,
-  hoverCard,
-  hoverCardTemplate,
   cpuMaxFilter,
   ioMaxFilter,
   nicMaxFilter,
@@ -17,24 +15,19 @@ import {
   langSelect,
 } from './config.js';
 
-import { t, setLanguage, applyI18nStatic, METRIC_IMAGE_LABELS, currentLang } from './i18n.js';
+import { t, setLanguage, applyI18nStatic, currentLang } from './i18n.js';
 
 import { loadServerCache, saveServerCache, loadUserFilters, saveUserFilters, applyUserFiltersFromStorage } from './storage.js';
 
-import { fetchStaticNodes, fetchGlobalMetrics, getServerDetail as getServerDetailRaw } from './api.js';
+import { fetchStaticNodes, fetchGlobalMetrics } from './api.js';
 import * as Table from './table.js';
 import * as Filters from './filters.js';
 import * as UI from './ui.js';
 
-
 let nodes = [];
 const nodeLookup = new Map();
-const detailCache = new Map();
-const pendingDetailRequests = new Map();
 const globalMetrics = new Map();
 const selectedCountryCodes = new Set();
-
-const DETAIL_TTL_MS = 60 * 60 * 1000; // 1 小時
 
 let sortState = { key: "region", direction: "asc" };
 function buildFiltersSnapshot() {
@@ -51,23 +44,9 @@ function buildFiltersSnapshot() {
   };
 }
 
-
-
 // ================= i18n =================
 
-
-
-
-
-
-
-
-
-
-
-
-// METRIC_LABELS / METRIC_IMAGE_LABELS are defined via i18n and setLanguage()
-
+// METRIC_LABELS are defined via i18n and setLanguage()
 
 const SORTERS = {
   region: (node) => (node.locationRegion || node.location || "").toLowerCase(),
@@ -80,8 +59,6 @@ const SORTERS = {
   network: (node) => getGlobalMetricSortValue(node.sid, "network"),
   congestion: (node) => getGlobalMetricSortValue(node.sid, "congestion"),
 };
-
-
 
 bootstrap();
 
@@ -106,7 +83,6 @@ async function bootstrap() {
     setSortState: (s) => { sortState = s; },
     getDisplaySortExtractor: (key) => SORTERS[key] ?? SORTERS.region,
     getFilteredNodes: Filters.getFilteredNodes,
-    getServerDetailCached,
     onSortChanged: () => {
       const list = Filters.getFilteredNodes();
       Table.renderTable(list);
@@ -124,7 +100,6 @@ async function bootstrap() {
     congestionMaxFilter,
     getNodes: () => nodes,
     renderTable: Table.renderTable,
-    hideHoverCard: UI.hideHoverCard,
     saveUserFilters,
     buildFiltersSnapshot,
     refreshCountryFilterUI: UI.refreshCountryFilterUI,
@@ -137,8 +112,6 @@ async function bootstrap() {
     tableBody,
     countryFilterContainer,
     countryToggle,
-    hoverCard,
-    hoverCardTemplate,
     langSelect,
     locationFilter,
     searchInput,
@@ -149,7 +122,6 @@ async function bootstrap() {
     bestServerBtn,
     resetFiltersBtn,
     selectedCountryCodes,
-    nodeLookup,
     t,
     setLanguage,
     onAfterLanguageChange: () => {
@@ -162,9 +134,6 @@ async function bootstrap() {
     onResetFilters: () => Filters.resetFilters(),
     onTableRowClick,
     renderTable: Table.renderTable,
-    getServerDetailCached,
-    buildDetailRows,
-    formatTime,
     onBestServerPreset: applyBestServerPreset,
   });
   applyI18nStatic();
@@ -244,7 +213,6 @@ async function startBackgroundRefresh() {
   }
 }
 
-
 async function initialize() {
   Table.setTablePlaceholder(t('table.loading'));
   try {
@@ -290,33 +258,11 @@ async function initialize() {
   }
 }
 
-
-
 function mergeGlobalMetrics(metricsMap) {
   globalMetrics.clear();
   metricsMap.forEach((value, key) => {
     globalMetrics.set(String(key), value);
   });
-}
-
-function toSidKey(sid) {
-  return typeof sid === 'string' ? sid : String(sid);
-}
-
-function ensureDetailTimestamp(detail) {
-  if (!detail) return null;
-  if (!(detail.fetchedAt instanceof Date)) {
-    detail.fetchedAt = detail.fetchedAt ? new Date(detail.fetchedAt) : new Date();
-  }
-  return detail;
-}
-
-function isDetailStale(detail) {
-  const normalized = ensureDetailTimestamp(detail);
-  if (!normalized?.fetchedAt) return true;
-  const ts = normalized.fetchedAt.getTime();
-  if (!Number.isFinite(ts)) return true;
-  return (Date.now() - ts) > DETAIL_TTL_MS;
 }
 
 // 依使用者 IP 自動推測語言（KR->ko, JP->ja, HK/TW/CN->zh, 其他->en）
@@ -360,14 +306,6 @@ function mapCountryToLang(cc) {
   return 'en';
 }
 
-
-
-
-
-
-
-
-
 function applyBestServerPreset() {
   const base = Filters.getFilteredNodes();
   const subset = base.filter((node) => {
@@ -378,26 +316,11 @@ function applyBestServerPreset() {
   });
   //
 
-
-
-
-
-
   sortState = { key: "network", direction: "asc" };
   const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
   Table.updateSortIndicators(headers);
   Table.renderTable(subset);
-  UI.hideHoverCard();
 }
-
-
-
-
-
-
-
-
-
 
 function createCountryOption(code, label, count) {
   const wrapper = document.createElement("label");
@@ -421,158 +344,11 @@ function createCountryOption(code, label, count) {
   return { element: wrapper, input: checkbox };
 }
 
-
-
 function onTableRowClick(event) {
   const link = event.target.closest('.sid-link');
   if (!link) return; // 只有點 SID 欄位才作用
   event.preventDefault();
   window.open(link.href, "_blank", "noopener,noreferrer");
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-async function getServerDetailCached(sid, { forceRefresh = false } = {}) {
-  const key = toSidKey(sid);
-  const cached = detailCache.get(key) ?? detailCache.get(sid);
-
-  if (cached && !forceRefresh && !isDetailStale(cached)) {
-    detailCache.set(key, ensureDetailTimestamp(cached));
-    return cached;
-  }
-
-  const pendingKey = pendingDetailRequests.has(key)
-    ? key
-    : (pendingDetailRequests.has(sid) ? sid : null);
-
-  if (!forceRefresh && pendingKey !== null) {
-    return pendingDetailRequests.get(pendingKey);
-  }
-
-  const request = getServerDetailRaw(sid)
-    .then((detail) => {
-      const normalized = ensureDetailTimestamp(detail) ?? {};
-      detailCache.set(key, normalized);
-      if (key !== sid) {
-        detailCache.delete(sid);
-      }
-      pendingDetailRequests.delete(key);
-      if (key !== sid) {
-        pendingDetailRequests.delete(sid);
-      }
-      return normalized;
-    })
-    .catch((error) => {
-      pendingDetailRequests.delete(key);
-      if (key !== sid) {
-        pendingDetailRequests.delete(sid);
-      }
-      throw error;
-    });
-
-  pendingDetailRequests.set(key, request);
-  if (key !== sid) {
-    pendingDetailRequests.delete(sid);
-  }
-  return request;
-}
-
-// Helpers for parsing list-based labels/values in server status panel
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function buildDetailRows(baseNode, detail) {
-  const rows = [
-    { label: t('hover.labels.ipv4'), value: baseNode.ip },
-    { label: t('hover.labels.privateIp'), value: detail.privateIp || "—" },
-    { label: t('hover.labels.uptime'), value: detail.uptime || "—" },
-    { label: t('hover.labels.heartbeat'), value: detail.heartbeat || "—" },
-  ];
-
-  if (detail.pricePolicy?.length) {
-    rows.push({ label: t('hover.labels.pricePolicy'), value: detail.pricePolicy.join("\n") });
-  }
-
-  const aggregated = globalMetrics.get(String(baseNode.sid));
-  if (aggregated) {
-    rows.push({ label: t('hover.labels.cpu'), value: aggregated.cpuLoadText ?? "—" });
-    rows.push({ label: t('hover.labels.ioWait'), value: aggregated.ioWaitText ?? "—" });
-    rows.push({ label: t('hover.labels.nicError'), value: aggregated.nicErrorText ?? "—" });
-    rows.push({ label: t('hover.labels.network'), value: aggregated.networkText ?? "—" });
-    rows.push({ label: t('hover.labels.congestion'), value: aggregated.congestionText ?? "—" });
-  }
-
-  const metrics = detail.metrics ?? {};
-  [
-    ["systemLoad", metrics.systemLoad],
-    ["network", metrics.network],
-    ["congestion", metrics.congestion],
-  ].forEach(([key, metric]) => {
-    if (!metric?.image) {
-      return;
-    }
-    rows.push({
-      label: METRIC_IMAGE_LABELS[key],
-      value: { type: "image", src: metric.image, alt: METRIC_IMAGE_LABELS[key] },
-    });
-  });
-
-  return rows;
-}
-
-function formatTime(date) {
-  const locale =
-    currentLang === 'en' ? 'en-US' :
-    currentLang === 'ja' ? 'ja-JP' :
-    currentLang === 'ko' ? 'ko-KR' : 'zh-TW';
-  return new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date);
 }
 
 function splitLocationParts(fullLocation) {
@@ -624,10 +400,6 @@ function deriveCountryCode(node) {
   }
   return "??";
 }
-
-
-
-
 
 function getGlobalMetricSortValue(sid, key) {
   const metrics = globalMetrics.get(String(sid));
