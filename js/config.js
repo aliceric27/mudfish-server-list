@@ -23,4 +23,14 @@ export const nicMaxFilter = document.getElementById("nicMaxFilter");
 export const congestionMaxFilter = document.getElementById("congestionMaxFilter");
 export const bestServerBtn = document.getElementById("bestServerBtn");
 export const resetFiltersBtn = document.getElementById("resetFiltersBtn");
+export const downloadSocks5Btn = document.getElementById("downloadSocks5Btn");
 export const langSelect = document.getElementById("langSelect");
+
+// Socks5 Modal elements
+export const socks5Modal = document.getElementById("socks5Modal");
+export const socks5ModalClose = document.getElementById("socks5ModalClose");
+export const socks5ModalCancel = document.getElementById("socks5ModalCancel");
+export const socks5ModalDownload = document.getElementById("socks5ModalDownload");
+export const socks5Username = document.getElementById("socks5Username");
+export const socks5Password = document.getElementById("socks5Password");
+export const socks5Port = document.getElementById("socks5Port");

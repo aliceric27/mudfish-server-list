@@ -57,6 +57,7 @@
           </label>
           <button id="bestServerBtn" class="action-button" type="button">最佳伺服器</button>
           <button id="resetFiltersBtn" class="action-button" type="button">重置篩選</button>
+          <button id="downloadSocks5Btn" class="action-button" type="button">Socks5 設定檔下載</button>
         </div>
       </div>
     </section>
@@ -94,6 +95,35 @@
       </ul>
     </section>
   </main>
+
+  <!-- Socks5 帳號密碼設定 Modal -->
+  <div id="socks5Modal" class="modal" hidden>
+    <div class="modal__overlay"></div>
+    <div class="modal__container">
+      <div class="modal__header">
+        <h2 class="modal__title">Socks5 帳號密碼設定</h2>
+        <button id="socks5ModalClose" class="modal__close" type="button" aria-label="關閉對話框">×</button>
+      </div>
+      <div class="modal__body">
+        <div class="modal__field">
+          <label for="socks5Username" class="modal__label">帳號</label>
+          <input type="text" id="socks5Username" class="modal__input" placeholder="請輸入 Socks5 帳號">
+        </div>
+        <div class="modal__field">
+          <label for="socks5Password" class="modal__label">密碼</label>
+          <input type="password" id="socks5Password" class="modal__input" placeholder="請輸入 Socks5 密碼">
+        </div>
+        <div class="modal__field">
+          <label for="socks5Port" class="modal__label">連接埠</label>
+          <input type="number" id="socks5Port" class="modal__input" placeholder="預設 18081" value="18081" min="1" max="65535">
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button id="socks5ModalCancel" class="modal__button modal__button--secondary" type="button">取消</button>
+        <button id="socks5ModalDownload" class="modal__button modal__button--primary" type="button">下載設定檔</button>
+      </div>
+    </div>
+  </div>
 
 
   <script src="js/app.js" type="module"></script>

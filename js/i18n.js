@@ -2,7 +2,7 @@
 // 責任：維護 I18N 字典、目前語言、翻譯函數 t()、語言切換 setLanguage()、
 // 以及將靜態文案套用到頁面上的 applyI18nStatic()
 
-import { locationFilter, searchInput, langSelect, bestServerBtn, resetFiltersBtn } from './config.js';
+import { locationFilter, searchInput, langSelect, bestServerBtn, resetFiltersBtn, downloadSocks5Btn } from './config.js';
 
 // 預設英語，若無使用者偏好且 IP 偵測失敗時使用
 export let currentLang = 'en'; // zh | en | ja | ko
@@ -22,13 +22,31 @@ export const I18N = {
       },
     },
     load: { section: '系統負載篩選', aria: '系統負載數值篩選', cpu: 'CPU', io: 'IO', nic: '錯誤', congestion: '擁擠', any: '任意' },
-    buttons: { best: '最佳伺服器', reset: '重置篩選' },
+    buttons: { best: '最佳伺服器', reset: '重置篩選', socks5Download: 'Socks5 設定檔下載' },
+    socks5Modal: {
+      title: 'Socks5 帳號密碼設定',
+      username: '帳號',
+      password: '密碼',
+      port: '連接埠',
+      download: '下載設定檔',
+      cancel: '取消',
+      ok: '確定',
+      directDownload: '直接下載',
+      messageTitle: '訊息',
+      usernamePlaceholder: '請輸入 Socks5 帳號',
+      passwordPlaceholder: '請輸入 Socks5 密碼',
+      portPlaceholder: '預設 18081',
+      confirmMessage: (count) => `即將下載 ${count} 個節點的 Socks5 設定檔。\n\n是否要填入帳號密碼？\n（選擇「直接下載」將不包含帳號密碼欄位）`,
+  // 移除驗證模式顯示
+  downloadSuccess: (count) => `✅ 下載成功！\n\n已產生 ${count} 個節點的 Socks5 設定檔`,
+      downloadError: (error) => `❌ 下載失敗\n\n${error}`,
+    },
     table: {
       headers: { region: '位置', provider: '供應商', ip: 'IPv4', sid: '節點 SID', cpu: 'CPU %', ioWait: 'IO 等待 %', nicError: '網卡錯誤數', network: '流量 (MB)', congestion: '擁擠度' },
       loading: '正在載入資料…',
       empty: '找不到符合條件的節點。',
     },
-    errors: { loadFailed: '無法取得伺服器資料，請稍後再試。' },
+    errors: { loadFailed: '無法取得伺服器資料,請稍後再試。', noNodesFiltered: '沒有可用的節點，請調整篩選條件' },
     metricLabels: { systemLoad: '系統負載', network: '流量', congestion: '擁擠度' },
     metricImageLabels: { systemLoad: '系統負載圖表', network: '流量趨勢圖', congestion: '擁擠度趨勢圖' },
     usage: {
@@ -112,13 +130,31 @@ export const I18N = {
       },
     },
     load: { section: 'System Load Filters', aria: 'System load value filters', cpu: 'CPU', io: 'IO', nic: 'Errors', congestion: 'Congestion', any: 'Any' },
-    buttons: { best: 'Best Server', reset: 'Reset Filters' },
+    buttons: { best: 'Best Server', reset: 'Reset Filters', socks5Download: 'Download Socks5 Config' },
+    socks5Modal: {
+      title: 'Socks5 Credentials Settings',
+      username: 'Username',
+      password: 'Password',
+      port: 'Port',
+      download: 'Download Config',
+      cancel: 'Cancel',
+      ok: 'OK',
+      directDownload: 'Direct Download',
+      messageTitle: 'Message',
+      usernamePlaceholder: 'Enter Socks5 username',
+      passwordPlaceholder: 'Enter Socks5 password',
+      portPlaceholder: 'Default 18081',
+      confirmMessage: (count) => `About to download Socks5 config for ${count} nodes.\n\nDo you want to include credentials?\n(Click "Direct Download" to skip username/password fields)`,
+  // Authentication line removed per requirement
+  downloadSuccess: (count) => `✅ Download Successful!\n\nGenerated Socks5 config for ${count} nodes`,
+      downloadError: (error) => `❌ Download Failed\n\n${error}`,
+    },
     table: {
       headers: { region: 'Region', provider: 'Provider', ip: 'IPv4', sid: 'Node SID', cpu: 'CPU %', ioWait: 'IO Wait %', nicError: 'NIC Errors', network: 'Traffic (MB)', congestion: 'Congestion' },
       loading: 'Loading…',
       empty: 'No matching nodes found.',
     },
-    errors: { loadFailed: 'Failed to fetch data. Please try again later.' },
+    errors: { loadFailed: 'Failed to fetch data. Please try again later.', noNodesFiltered: 'No nodes available. Please adjust filter conditions' },
     metricLabels: { systemLoad: 'System Load', network: 'Traffic', congestion: 'Congestion' },
     metricImageLabels: { systemLoad: 'System Load Chart', network: 'Traffic Trend', congestion: 'Congestion Trend' },
     usage: {
@@ -202,13 +238,31 @@ export const I18N = {
       },
     },
     load: { section: 'システム負荷フィルター', aria: 'システム負荷の数値フィルター', cpu: 'CPU', io: 'IO', nic: 'エラー', congestion: '混雑度', any: '指定なし' },
-    buttons: { best: '最適サーバー', reset: 'フィルターをリセット' },
+    buttons: { best: '最適サーバー', reset: 'フィルターをリセット', socks5Download: 'Socks5 設定ダウンロード' },
+    socks5Modal: {
+      title: 'Socks5 認証情報設定',
+      username: 'ユーザー名',
+      password: 'パスワード',
+      port: 'ポート',
+      download: '設定ファイルをダウンロード',
+      cancel: 'キャンセル',
+      ok: 'OK',
+      directDownload: '直接ダウンロード',
+      messageTitle: 'メッセージ',
+      usernamePlaceholder: 'Socks5 ユーザー名を入力',
+      passwordPlaceholder: 'Socks5 パスワードを入力',
+      portPlaceholder: 'デフォルト 18081',
+      confirmMessage: (count) => `${count} 個のノードの Socks5 設定をダウンロードします。\n\n認証情報を含めますか？\n（「直接ダウンロード」を選択するとユーザー名/パスワードフィールドは含まれません）`,
+  // 認証行削除
+  downloadSuccess: (count) => `✅ ダウンロード成功！\n\n${count} 個のノードの Socks5 設定を生成しました`,
+      downloadError: (error) => `❌ ダウンロード失敗\n\n${error}`,
+    },
     table: {
       headers: { region: '位置', provider: 'プロバイダー', ip: 'IPv4', sid: 'ノード SID', cpu: 'CPU %', ioWait: 'IO 待機 %', nicError: 'NIC エラー数', network: 'トラフィック (MB)', congestion: '混雑度' },
       loading: '読み込み中…',
       empty: '一致するノードがありません。',
     },
-    errors: { loadFailed: 'データの取得に失敗しました。しばらくしてからお試しください。' },
+    errors: { loadFailed: 'データの取得に失敗しました。しばらくしてからお試しください。', noNodesFiltered: '利用可能なノードがありません。フィルター条件を調整してください' },
     metricLabels: { systemLoad: 'システム負荷', network: 'トラフィック', congestion: '混雑度' },
     metricImageLabels: { systemLoad: 'システム負荷グラフ', network: 'トラフィック推移', congestion: '混雑度推移' },
     usage: {
@@ -292,13 +346,31 @@ export const I18N = {
       },
     },
     load: { section: '시스템 부하 필터', aria: '시스템 부하 값 필터', cpu: 'CPU', io: 'IO', nic: '오류', congestion: '혼잡도', any: '제한 없음' },
-    buttons: { best: '최적 서버', reset: '필터 초기화' },
+    buttons: { best: '최적 서버', reset: '필터 초기화', socks5Download: 'Socks5 설정 다운로드' },
+    socks5Modal: {
+      title: 'Socks5 인증 정보 설정',
+      username: '사용자명',
+      password: '비밀번호',
+      port: '포트',
+      download: '설정 파일 다운로드',
+      cancel: '취소',
+      ok: '확인',
+      directDownload: '직접 다운로드',
+      messageTitle: '메시지',
+      usernamePlaceholder: 'Socks5 사용자명 입력',
+      passwordPlaceholder: 'Socks5 비밀번호 입력',
+      portPlaceholder: '기본값 18081',
+      confirmMessage: (count) => `${count}개 노드의 Socks5 설정을 다운로드합니다.\n\n인증 정보를 포함하시겠습니까?\n("직접 다운로드"를 선택하면 사용자명/비밀번호 필드가 포함되지 않습니다)`,
+  // 인증 표시 제거
+  downloadSuccess: (count) => `✅ 다운로드 성공!\n\n${count}개 노드의 Socks5 설정을 생성했습니다`,
+      downloadError: (error) => `❌ 다운로드 실패\n\n${error}`,
+    },
     table: {
       headers: { region: '위치', provider: '제공업체', ip: 'IPv4', sid: '노드 SID', cpu: 'CPU %', ioWait: 'IO 대기 %', nicError: 'NIC 오류 수', network: '트래픽 (MB)', congestion: '혼잡도' },
       loading: '로딩 중…',
       empty: '일치하는 노드가 없습니다.',
     },
-    errors: { loadFailed: '데이터를 가져오지 못했습니다. 잠시 후 다시 시도하세요.' },
+    errors: { loadFailed: '데이터를 가져오지 못했습니다. 잠시 후 다시 시도하세요.', noNodesFiltered: '사용 가능한 노드가 없습니다. 필터 조건을 조정하세요' },
     metricLabels: { systemLoad: '시스템 부하', network: '트래픽', congestion: '혼잡도' },
     metricImageLabels: { systemLoad: '시스템 부하 차트', network: '트래픽 추이', congestion: '혼잡도 추이' },
     usage: {
@@ -455,6 +527,7 @@ function applyDashboardStatic() {
 
   if (bestServerBtn) bestServerBtn.textContent = t('buttons.best');
   if (resetFiltersBtn) resetFiltersBtn.textContent = t('buttons.reset');
+  if (downloadSocks5Btn) downloadSocks5Btn.textContent = t('buttons.socks5Download');
 
   const headerMap = {
     region: t('table.headers.region'),

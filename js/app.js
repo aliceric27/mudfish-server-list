@@ -12,6 +12,7 @@ import {
   congestionMaxFilter,
   bestServerBtn,
   resetFiltersBtn,
+  downloadSocks5Btn,
   langSelect,
 } from './config.js';
 
@@ -23,6 +24,8 @@ import { fetchStaticNodes, fetchGlobalMetrics } from './api.js';
 import * as Table from './table.js';
 import * as Filters from './filters.js';
 import * as UI from './ui.js';
+import { downloadClashSocks5Config } from './socks5.js';
+import { showSocks5Modal, showConfirmModal, showMessageModal, updateModalI18n } from './modal.js';
 
 let nodes = [];
 const nodeLookup = new Map();
@@ -121,11 +124,13 @@ async function bootstrap() {
     congestionMaxFilter,
     bestServerBtn,
     resetFiltersBtn,
+    downloadSocks5Btn,
     selectedCountryCodes,
     t,
     setLanguage,
     onAfterLanguageChange: () => {
       UI.updateCountryToggleLabel();
+      updateModalI18n(); // 更新 Modal 的多語言文字
       const list = Filters.getFilteredNodes();
       Table.renderTable(list);
       saveUserFilters(buildFiltersSnapshot());
@@ -135,6 +140,7 @@ async function bootstrap() {
     onTableRowClick,
     renderTable: Table.renderTable,
     onBestServerPreset: applyBestServerPreset,
+    onDownloadSocks5: handleDownloadSocks5Config,
   });
   applyI18nStatic();
   UI.updateCountryToggleLabel();
@@ -306,7 +312,7 @@ function mapCountryToLang(cc) {
   return 'en';
 }
 
-function applyBestServerPreset() {
+function applyBestServerPreset() { 
   const base = Filters.getFilteredNodes();
   const subset = base.filter((node) => {
     const m = globalMetrics.get(String(node.sid));
@@ -320,6 +326,86 @@ function applyBestServerPreset() {
   const headers = document.querySelectorAll("#serverTable thead th[data-sort-key]");
   Table.updateSortIndicators(headers);
   Table.renderTable(subset);
+}
+
+async function handleDownloadSocks5Config() {
+  const filteredNodes = Filters.getFilteredNodes();
+  
+  if (filteredNodes.length === 0) {
+    await showMessageModal({
+      title: t('socks5Modal.messageTitle'),
+      message: t('errors.noNodesFiltered'),
+      type: 'error'
+    });
+    return;
+  }
+
+  // 詢問使用者是否要自訂帳號密碼
+  const confirmMessage = t('socks5Modal.confirmMessage', filteredNodes.length) || 
+    `即將下載 ${filteredNodes.length} 個節點的 Socks5 設定檔。\n\n是否要填入帳號密碼？\n（選擇「取消」將不包含帳號密碼欄位）`;
+  
+  const wantCustomize = await showConfirmModal({
+    title: t('socks5Modal.messageTitle'),
+    message: confirmMessage
+  });
+
+  // 使用者點擊 X 或 ESC 取消操作
+  if (wantCustomize === null) {
+    console.log('使用者取消下載操作');
+    return;
+  }
+
+  let credentials = {
+    username: '',
+    password: '',
+    port: 18081
+  };
+
+  if (wantCustomize) {
+    // 顯示 Modal 讓使用者輸入
+    const userInput = await showSocks5Modal({
+      username: '',
+      password: '',
+      port: 18081
+    });
+    
+    if (!userInput) {
+      // 使用者在 Modal 中取消
+      console.log('使用者取消下載');
+      return;
+    }
+    
+    credentials = userInput;
+  }
+  // 如果 wantCustomize === false，使用空憑證（直接下載無驗證模式）
+
+  // 執行下載
+  try {
+    const success = downloadClashSocks5Config(filteredNodes, credentials);
+
+    if (success) {
+      // 與 socks5.js 的 needsAuth 判斷保持一致（去除空白並確保為字串）
+      const userStr = (credentials.username ?? '').toString().trim();
+      const passStr = (credentials.password ?? '').toString().trim();
+      const hasAuth = userStr.length > 0 && passStr.length > 0;
+      console.log(`已產生 ${filteredNodes.length} 個節點的 Socks5 設定檔`);
+      if (hasAuth) console.log('使用的帳號:', userStr); else console.log('模式: 無需驗證（未包含帳號密碼）');
+
+      // 顯示成功訊息
+      await showMessageModal({
+        title: t('socks5Modal.messageTitle'),
+  message: t('socks5Modal.downloadSuccess', filteredNodes.length),
+        type: 'success'
+      });
+    }
+  } catch (error) {
+    // 顯示錯誤訊息
+    await showMessageModal({
+      title: t('socks5Modal.messageTitle'),
+      message: t('socks5Modal.downloadError', error.message || error),
+      type: 'error'
+    });
+  }
 }
 
 function createCountryOption(code, label, count) {

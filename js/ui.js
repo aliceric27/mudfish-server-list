@@ -14,6 +14,7 @@ let deps = {
   congestionMaxFilter: null,
   bestServerBtn: null,
   resetFiltersBtn: null,
+  downloadSocks5Btn: null,
 
   // 狀態/資料
   selectedCountryCodes: null, // Set
@@ -26,6 +27,7 @@ let deps = {
   onResetFilters: null,        // () => void
   onTableRowClick: null,       // (event) => void
   renderTable: null,           // (list) => void
+  onDownloadSocks5: null,      // () => void
 };
 
 // 本模組的內部狀態
@@ -46,6 +48,7 @@ export function attachEventListeners() {
   deps.congestionMaxFilter?.addEventListener('input', () => deps.onFiltersChange?.());
   deps.bestServerBtn?.addEventListener('click', () => deps.onBestServerPreset?.());
   deps.resetFiltersBtn?.addEventListener('click', () => deps.onResetFilters?.());
+  deps.downloadSocks5Btn?.addEventListener('click', () => deps.onDownloadSocks5?.());
   // 語言切換
   if (deps.langSelect) {
     deps.langSelect.addEventListener('change', (e) => {
