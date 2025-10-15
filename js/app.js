@@ -476,13 +476,15 @@ function enrichNode(node) {
 }
 
 function deriveCountryCode(node) {
+  const locationSource = node.locationRegion || node.location || "";
+  // 優先依據位置欄位前綴辨識，hostname 有時候會保留舊代碼（例如 US→HK）
+  const locationMatch = locationSource.match(/^([A-Z]{2})(?:\s|$)/i);
+  if (locationMatch) {
+    return locationMatch[1].toUpperCase();
+  }
   const hostMatch = node.hostname?.match(/^node-([a-z]{2})-/i);
   if (hostMatch) {
     return hostMatch[1].toUpperCase();
-  }
-  const locationMatch = node.location?.match(/^([A-Z]{2})\s/);
-  if (locationMatch) {
-    return locationMatch[1].toUpperCase();
   }
   return "??";
 }
