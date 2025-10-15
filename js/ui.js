@@ -34,6 +34,19 @@ let deps = {
 let isCountryPanelOpen = false;
 const countryCheckboxes = new Map();
 
+function formatAllOptionLabel(rawLabel) {
+  const label = rawLabel ?? '';
+  const asciiMatch = label.match(/\(([^)]+)\)/);
+  if (asciiMatch && asciiMatch[1]) {
+    return asciiMatch[1];
+  }
+  const fullWidthMatch = label.match(/（([^）]+)）/);
+  if (fullWidthMatch && fullWidthMatch[1]) {
+    return fullWidthMatch[1];
+  }
+  return label || 'All';
+}
+
 export function initUI(initDeps) {
   deps = { ...deps, ...initDeps };
 }
@@ -103,19 +116,25 @@ export function createCountryOption(code, label, count) {
   input.value = code;
 
   const span = document.createElement('span');
-  span.textContent = `${label} (${count})`;
+  span.className = 'country-filter__label';
+  span.textContent = label;
 
-  wrapper.appendChild(input);
-  wrapper.appendChild(span);
-  return { element: wrapper, input };
+  const countBadge = document.createElement('span');
+  countBadge.className = 'country-filter__count';
+  countBadge.textContent = String(count);
+
+  wrapper.append(input, span, countBadge);
+  return { element: wrapper, input, labelEl: span, countEl: countBadge, count: Number(count) };
 }
 
 export function refreshCountryFilterUI() {
-  countryCheckboxes.forEach((input, code) => {
+  countryCheckboxes.forEach((entry, code) => {
+    const checkbox = entry?.input;
+    if (!checkbox) return;
     if (code === '__all__') {
-      input.checked = (deps.selectedCountryCodes?.size ?? 0) === 0;
+      checkbox.checked = (deps.selectedCountryCodes?.size ?? 0) === 0;
     } else {
-      input.checked = deps.selectedCountryCodes?.has(code) ?? false;
+      checkbox.checked = deps.selectedCountryCodes?.has(code) ?? false;
     }
   });
 }
@@ -149,9 +168,11 @@ export function populateCountryFilter(nodeList) {
   const sorted = Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], 'en'));
   const fragment = document.createDocumentFragment();
 
-  const allOption = createCountryOption('__all__', '全部', nodeList.length);
+  const allLabel = deps.t?.('country.all') ?? 'All';
+  const allOptionLabel = formatAllOptionLabel(allLabel);
+  const allOption = createCountryOption('__all__', allOptionLabel, nodeList.length);
   fragment.appendChild(allOption.element);
-  countryCheckboxes.set('__all__', allOption.input);
+  countryCheckboxes.set('__all__', allOption);
   allOption.input.addEventListener('change', () => {
     deps.selectedCountryCodes?.clear?.();
     refreshCountryFilterUI();
@@ -163,7 +184,7 @@ export function populateCountryFilter(nodeList) {
   sorted.forEach(([code, count]) => {
     const option = createCountryOption(code, code, count);
     fragment.appendChild(option.element);
-    countryCheckboxes.set(code, option.input);
+    countryCheckboxes.set(code, option);
     option.input.addEventListener('change', () => {
       if (option.input.checked) deps.selectedCountryCodes?.add(code);
       else deps.selectedCountryCodes?.delete(code);
@@ -173,6 +194,13 @@ export function populateCountryFilter(nodeList) {
   });
 
   deps.countryFilterContainer.appendChild(fragment);
+}
+
+export function updateCountryFilterLabels() {
+  const allEntry = countryCheckboxes.get('__all__');
+  if (!allEntry || !allEntry.labelEl) return;
+  const label = deps.t?.('country.all') ?? 'All';
+  allEntry.labelEl.textContent = formatAllOptionLabel(label);
 }
 
 

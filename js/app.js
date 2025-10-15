@@ -130,6 +130,7 @@ async function bootstrap() {
     setLanguage,
     onAfterLanguageChange: () => {
       UI.updateCountryToggleLabel();
+      UI.updateCountryFilterLabels();
       updateModalI18n(); // 更新 Modal 的多語言文字
       const list = Filters.getFilteredNodes();
       Table.renderTable(list);
@@ -167,6 +168,7 @@ async function bootstrap() {
         applyUserFiltersFromStorage(saved, {
           setLanguage,
           updateCountryToggleLabel: UI.updateCountryToggleLabel,
+          updateCountryFilterLabels: UI.updateCountryFilterLabels,
           locationFilter, searchInput, cpuMaxFilter, ioMaxFilter, nicMaxFilter, congestionMaxFilter,
           selectedCountryCodes,
           refreshCountryFilterUI: UI.refreshCountryFilterUI,
@@ -246,6 +248,7 @@ async function initialize() {
       applyUserFiltersFromStorage(savedFiltersOnInit, {
         setLanguage,
         updateCountryToggleLabel: UI.updateCountryToggleLabel,
+        updateCountryFilterLabels: UI.updateCountryFilterLabels,
         locationFilter, searchInput, cpuMaxFilter, ioMaxFilter, nicMaxFilter, congestionMaxFilter,
         selectedCountryCodes,
         refreshCountryFilterUI: UI.refreshCountryFilterUI,

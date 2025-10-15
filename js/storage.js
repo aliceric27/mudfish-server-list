@@ -80,6 +80,7 @@ export function applyUserFiltersFromStorage(filters, deps) {
   if (filters.lang && typeof deps.setLanguage === 'function') {
     deps.setLanguage(filters.lang);
     if (typeof deps.updateCountryToggleLabel === 'function') deps.updateCountryToggleLabel();
+    if (typeof deps.updateCountryFilterLabels === 'function') deps.updateCountryFilterLabels();
   }
 
   // DOM 欄位
